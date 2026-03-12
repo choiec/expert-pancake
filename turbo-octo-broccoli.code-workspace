@@ -1,0 +1,23 @@
+{
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "../legacy"
+    }
+  ],
+  "settings": {
+    "deno.enable": true,
+    "deno.lint": true,
+    "files.exclude": {
+      "**/.git": true,
+      "**/node_modules": true
+    },
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "denoland.vscode-deno",
+    "[dockercompose]": {
+      "editor.defaultFormatter": "ms-azuretools.vscode-containers"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "rules": {
+    "no-unused-vars": true,
+    "no-explicit-any": true,
+    "no-var": true,
+    "prefer-const": true,
+    "eqeqeq": true,
+    "camelcase": true,
+    "max-len": { "code": 100 },
+    "no-multiple-empty-lines": true,
+    "object-curly-spacing": "always",
+    "quotes": "double",
+    "semi": true,
+    "no-console": false,
+    "trailing-comma": "never"
+  },
+  "ignore": [
+    "node_modules/",
+    "dist/",
+    ".venv/"
+  ]
+}

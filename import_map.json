@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "app/": "./src/",
+    "hono": "jsr:@hono/hono@^4.12.7",
+    "@apollo/server": "npm:@apollo/server@^4.10.0",
+    "@neo4j/graphql": "npm:@neo4j/graphql@^5.0.0",
+    "neo4j-driver": "npm:neo4j-driver@^5.15.0",
+    "graphql": "npm:graphql@^16.8.1"
+  }
+}
