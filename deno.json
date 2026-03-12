@@ -1,11 +1,21 @@
 {
-  "importMap": "import_map.json",
+  "imports": {
+    "app/": "./src/",
+    "drizzle-orm": "npm:drizzle-orm@^0.45.1",
+    "hono": "jsr:@hono/hono@^4.12.7",
+    "@apollo/server": "npm:@apollo/server@^4.10.0",
+    "@neo4j/graphql": "npm:@neo4j/graphql@^5.0.0",
+    "neo4j-driver": "npm:neo4j-driver@^5.15.0",
+    "graphql": "npm:graphql@^16.8.1",
+    "db/postgres": "jsr:@db/postgres"
+  },
+  "nodeModulesDir": "auto",
   "lint": {
     "include": ["src/"],
     "ignore": ["dist/", "node_modules/"]
   },
   "tasks": {
-    "start": "deno run --allow-net src/main.ts"
+    "start": "deno run --allow-net main.ts"
   },
   "compilerOptions": {
     "jsx": "precompile",
