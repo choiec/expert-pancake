@@ -2214,11 +2214,13 @@ dependencies = [
  "core_infra",
  "core_shared",
  "hex",
+ "meilisearch-sdk",
  "serde",
  "serde_json",
  "sha2",
  "time",
  "tokio",
+ "tracing",
  "uuid",
 ]
 

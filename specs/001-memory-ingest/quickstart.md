@@ -127,6 +127,18 @@ Expected behavior:
 - `200 OK` with search projection hits if Meilisearch is healthy and indexing completed
 - `503 Service Unavailable` with structured error if search is unavailable while retrieval remains operational
 
+Use a document-type filter to validate direct-standard projection behavior explicitly:
+
+```bash
+curl -i 'http://127.0.0.1:3000/search/memory-items?q=Rust&document-type=json&limit=10&offset=0'
+```
+
+Expected behavior:
+
+- only projection hits are returned
+- each hit contains `urn`, `source_id`, `sequence`, `document_type`, `content_preview`, and optional `score`
+- no authoritative `content` field is returned from the search endpoint
+
 ## Operational Validation Notes
 
 - Indexing backlog inspection is performed against the authoritative `memory_index_job` outbox records in SurrealDB. Operators should be able to distinguish `pending`, `retryable`, and `dead_letter` jobs.
@@ -134,6 +146,44 @@ Expected behavior:
 - Retry exhaustion must promote jobs to `dead_letter` without affecting authoritative source or memory-item availability.
 - Manual recovery must support re-indexing from authoritative SurrealDB data by replaying source identifiers from the outbox rather than depending on stale Meilisearch state.
 - Performance validation is part of operational readiness for this slice: emitted metrics and benchmark or load reports must be retained as evidence that AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, and NC-004 were checked.
+
+## Operator Queries
+
+Inspect the authoritative outbox backlog:
+
+```sql
+SELECT source_id, status, retry_count, last_error, available_at, created_at, updated_at
+FROM memory_index_job
+ORDER BY available_at ASC, created_at ASC;
+```
+
+Inspect only exhausted jobs:
+
+```sql
+SELECT source_id, status, retry_count, last_error, updated_at
+FROM memory_index_job
+WHERE status = 'dead_letter'
+ORDER BY updated_at DESC;
+```
+
+Requeue dead-letter jobs for manual recovery after search remediation:
+
+```sql
+UPDATE memory_index_job
+SET status = 'retryable', retry_count = 0, last_error = NONE, available_at = time::now(), updated_at = time::now()
+WHERE status = 'dead_letter';
+```
+
+## Benchmarks And Performance Gates
+
+Build and run the owned performance validation:
+
+```bash
+cargo test --test memory_ingest_slo
+cargo bench --bench memory_ingest_latency
+```
+
+The performance test asserts p95 and p99 thresholds for registration, retrieval, and search. The benchmark prints a reproducible report and Prometheus-compatible histogram output from the in-process metrics pipeline.
 
 ## Suggested Local Validation Sequence
 

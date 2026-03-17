@@ -1,11 +1,12 @@
 use async_trait::async_trait;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use core_shared::{AppResult, MemoryItemUrn};
 
 use crate::domain::memory_item::MemoryItem;
 use crate::domain::source::{NewSource, Source};
-use crate::infra::indexer::{IndexingJob, PublicIndexingStatus};
+use crate::infra::indexer::{IndexingJob, ProjectionInput, PublicIndexingStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceBundle {
@@ -49,4 +50,14 @@ pub trait MemoryQueryRepository: Send + Sync {
 #[async_trait]
 pub trait SourceQueryRepository: Send + Sync {
     async fn get_source(&self, source_id: Uuid) -> AppResult<SourceBundle>;
+}
+
+#[async_trait]
+pub trait IndexingOutboxRepository: Send + Sync {
+    async fn claim_next_job(&self, now: OffsetDateTime) -> AppResult<Option<IndexingJob>>;
+
+    async fn rehydrate_projection_inputs(&self, source_id: Uuid)
+    -> AppResult<Vec<ProjectionInput>>;
+
+    async fn update_job(&self, job: &IndexingJob) -> AppResult<()>;
 }

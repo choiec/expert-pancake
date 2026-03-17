@@ -30,6 +30,29 @@ This directory contains the public HTTP contract for the first memory-ingest ver
 - Storage-adapter contract tests must complement the public HTTP contract by verifying SurrealDB authoritative guarantees and Meilisearch projection guarantees required by the constitution.
 - Performance validation must use the instrumented metrics pipeline to measure p95/p99 latency and error rate against the published performance criteria.
 
+## Search Slice Commands
+
+Run the search endpoint and projection adapter coverage:
+
+```bash
+cargo test --test search_memory_items_contract --test meilisearch_projection_contract --test search_projection_flow --test indexing_status_mapping_flow
+```
+
+Run the observability coverage tied to public endpoint tracing and histogram metrics:
+
+```bash
+cargo test --test observability_tracing_flow --test observability_metrics
+```
+
+Run the performance gate and benchmark for the same slice:
+
+```bash
+cargo test --test memory_ingest_slo
+cargo bench --bench memory_ingest_latency
+```
+
+The search contract is satisfied only if `GET /search/memory-items` returns projection hits on healthy indexing and returns a structured `503` when Meilisearch is unavailable. There is no SurrealDB fallback path for search.
+
 ## Implementation Verification Checkpoints
 
 - **Standard-payload validation**: the contract is satisfied only when accepted, schema-invalid, and shape-valid-but-unmappable Open Badges and CLR payloads match the documented allow or reject outcomes and rejected requests create no authoritative state.

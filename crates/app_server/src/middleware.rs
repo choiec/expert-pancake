@@ -27,7 +27,7 @@ pub struct RequestContext {
 
 #[derive(Debug, Serialize)]
 pub struct ErrorPayload {
-    error_code: &'static str,
+    error_code: String,
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     details: Option<serde_json::Value>,
@@ -142,6 +142,7 @@ pub async fn latency_metrics(
 pub fn map_app_error(error: AppError, context: &RequestContext) -> Response {
     let status = match error.kind() {
         ErrorKind::Validation => StatusCode::BAD_REQUEST,
+        ErrorKind::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
         ErrorKind::Conflict => StatusCode::CONFLICT,
         ErrorKind::Timeout => StatusCode::REQUEST_TIMEOUT,
         ErrorKind::NotFound => StatusCode::NOT_FOUND,
@@ -151,7 +152,7 @@ pub fn map_app_error(error: AppError, context: &RequestContext) -> Response {
     };
 
     let payload = ErrorPayload {
-        error_code: error.error_code(),
+        error_code: error.error_code().to_owned(),
         message: error.message().to_string(),
         details: error.details().cloned(),
         timestamp: chrono_like_timestamp(),
@@ -162,6 +163,14 @@ pub fn map_app_error(error: AppError, context: &RequestContext) -> Response {
 }
 
 impl RequestContext {
+    pub fn fallback() -> Self {
+        Self {
+            request_id: Uuid::new_v4().to_string(),
+            traceparent: None,
+            tracestate: None,
+        }
+    }
+
     pub fn request_id(&self) -> &str {
         &self.request_id
     }

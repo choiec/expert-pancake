@@ -8,6 +8,7 @@ pub type CoreResult<T> = Result<T, AppError>;
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ErrorKind {
     Validation,
+    PayloadTooLarge,
     Conflict,
     Timeout,
     NotFound,
@@ -22,6 +23,7 @@ pub struct AppError {
     kind: ErrorKind,
     message: String,
     details: Option<Value>,
+    error_code_override: Option<String>,
 }
 
 impl AppError {
@@ -30,6 +32,7 @@ impl AppError {
             kind,
             message: message.into(),
             details: None,
+            error_code_override: None,
         }
     }
 
@@ -38,8 +41,17 @@ impl AppError {
         self
     }
 
+    pub fn with_error_code(mut self, error_code: impl Into<String>) -> Self {
+        self.error_code_override = Some(error_code.into());
+        self
+    }
+
     pub fn validation(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::Validation, message)
+    }
+
+    pub fn payload_too_large(message: impl Into<String>) -> Self {
+        Self::new(ErrorKind::PayloadTooLarge, message)
     }
 
     pub fn conflict(message: impl Into<String>) -> Self {
@@ -82,9 +94,14 @@ impl AppError {
         self.details.as_ref()
     }
 
-    pub fn error_code(&self) -> &'static str {
+    pub fn error_code(&self) -> &str {
+        if let Some(error_code) = self.error_code_override.as_deref() {
+            return error_code;
+        }
+
         match self.kind {
             ErrorKind::Validation => "INVALID_INPUT",
+            ErrorKind::PayloadTooLarge => "PAYLOAD_TOO_LARGE",
             ErrorKind::Conflict => "EXTERNAL_ID_CONFLICT",
             ErrorKind::Timeout => "NORMALIZATION_TIMEOUT",
             ErrorKind::NotFound => "NOT_FOUND",

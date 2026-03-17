@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+use core_shared::AppResult;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -74,10 +76,48 @@ pub struct ProjectionInput {
     pub updated_at: OffsetDateTime,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectionSearchQuery {
+    pub query: Option<String>,
+    pub source_id: Option<Uuid>,
+    pub document_type: Option<String>,
+    pub limit: usize,
+    pub offset: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProjectionSearchHit {
+    pub urn: String,
+    pub source_id: Uuid,
+    pub sequence: u32,
+    pub document_type: String,
+    pub content_preview: String,
+    pub score: Option<f32>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProjectionSearchResult {
+    pub total: usize,
+    pub limit: usize,
+    pub offset: usize,
+    pub items: Vec<ProjectionSearchHit>,
+}
+
 pub trait IndexingPort: Send + Sync {
     fn create_job(&self, source_id: Uuid, created_at: OffsetDateTime) -> IndexingJob;
 
     fn registration_status(&self) -> PublicIndexingStatus;
+}
+
+#[async_trait]
+pub trait ProjectionIndexPort: Send + Sync {
+    async fn ensure_index(&self) -> AppResult<()>;
+
+    async fn upsert(&self, documents: &[ProjectionInput]) -> AppResult<()>;
+
+    async fn search(&self, query: &ProjectionSearchQuery) -> AppResult<ProjectionSearchResult>;
+
+    async fn is_available(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]

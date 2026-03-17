@@ -199,6 +199,73 @@ impl InMemorySurrealDb {
         })
     }
 
+    pub fn latest_index_job(&self, source_id: Uuid) -> Option<PersistedIndexJobRecord> {
+        self.state
+            .lock()
+            .expect("surreal state poisoned")
+            .jobs_by_source_id
+            .get(&source_id)
+            .and_then(|jobs| jobs.last().cloned())
+    }
+
+    pub fn claim_next_index_job(&self, now: OffsetDateTime) -> Option<PersistedIndexJobRecord> {
+        let mut state = self.state.lock().expect("surreal state poisoned");
+        let mut selected: Option<(Uuid, usize, PersistedIndexJobRecord)> = None;
+
+        for (source_id, jobs) in &state.jobs_by_source_id {
+            for (index, job) in jobs.iter().enumerate() {
+                let eligible = matches!(job.status.as_str(), "pending" | "retryable")
+                    && job.available_at <= now;
+                if !eligible {
+                    continue;
+                }
+
+                let better = selected.as_ref().is_none_or(|(_, _, current)| {
+                    job.available_at < current.available_at
+                        || (job.available_at == current.available_at
+                            && job.created_at < current.created_at)
+                });
+
+                if better {
+                    selected = Some((*source_id, index, job.clone()));
+                }
+            }
+        }
+
+        let (source_id, index, mut job) = selected?;
+        job.status = "processing".to_owned();
+        job.updated_at = now;
+        state.jobs_by_source_id.get_mut(&source_id)?[index] = job.clone();
+        Some(job)
+    }
+
+    pub fn update_index_job(&self, job: PersistedIndexJobRecord) -> AppResult<()> {
+        let mut state = self.state.lock().expect("surreal state poisoned");
+        let jobs = state
+            .jobs_by_source_id
+            .get_mut(&job.source_id)
+            .ok_or_else(|| {
+                AppError::not_found(format!(
+                    "index job source '{}' was not found",
+                    job.source_id
+                ))
+            })?;
+
+        let Some(position) = jobs
+            .iter()
+            .position(|existing| existing.job_id == job.job_id)
+        else {
+            return Err(AppError::not_found(format!(
+                "index job '{}' was not found",
+                job.job_id
+            )));
+        };
+
+        jobs[position] = job;
+        jobs.sort_by_key(|record| record.created_at);
+        Ok(())
+    }
+
     pub fn commit_registration(
         &self,
         source: PersistedSourceRecord,
@@ -516,6 +583,63 @@ DEFINE INDEX IF NOT EXISTS memory_index_job_source_id_created_at ON TABLE {INDEX
         let rows: Vec<PersistedIndexJobRecord> =
             response.take(0).map_err(map_surreal_read_error)?;
         Ok(rows.into_iter().next())
+    }
+
+    pub async fn claim_next_index_job(
+        &self,
+        now: OffsetDateTime,
+    ) -> AppResult<Option<PersistedIndexJobRecord>> {
+        let mut response = self
+            .client
+            .query(format!(
+                "SELECT * FROM {INDEX_JOB_TABLE} WHERE available_at <= $now AND (status = 'pending' OR status = 'retryable') ORDER BY available_at ASC, created_at ASC LIMIT 1;"
+            ))
+            .bind(("now", now))
+            .await
+            .map_err(map_surreal_read_error)?;
+        let rows: Vec<PersistedIndexJobRecord> =
+            response.take(0).map_err(map_surreal_read_error)?;
+        let Some(mut job) = rows.into_iter().next() else {
+            return Ok(None);
+        };
+
+        job.status = "processing".to_owned();
+        job.updated_at = now;
+        self.update_index_job(job.clone()).await?;
+
+        Ok(Some(job))
+    }
+
+    pub async fn update_index_job(&self, job: PersistedIndexJobRecord) -> AppResult<()> {
+        let response = self
+            .client
+            .query(format!(
+                "UPDATE {INDEX_JOB_TABLE} SET status = $status, retry_count = $retry_count, last_error = $last_error, available_at = $available_at, updated_at = $updated_at WHERE job_id = $job_id;"
+            ))
+            .bind(("job_id", job.job_id))
+            .bind(("status", job.status))
+            .bind(("retry_count", job.retry_count))
+            .bind(("last_error", job.last_error))
+            .bind(("available_at", job.available_at))
+            .bind(("updated_at", job.updated_at))
+            .await
+            .map_err(map_surreal_write_error)?;
+        response.check().map_err(map_surreal_write_error)?;
+        Ok(())
+    }
+
+    pub async fn rehydrate_projection(
+        &self,
+        source_id: Uuid,
+    ) -> AppResult<Option<ProjectionRehydrationBundle>> {
+        let Some(source) = self.find_source_by_source_id(source_id).await? else {
+            return Ok(None);
+        };
+        let memory_items = self.find_memory_items_by_source_id(source_id).await?;
+        Ok(Some(ProjectionRehydrationBundle {
+            source,
+            memory_items,
+        }))
     }
 
     pub async fn find_memory_item_by_urn(

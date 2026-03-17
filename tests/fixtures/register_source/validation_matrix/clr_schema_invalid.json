@@ -1,0 +1,14 @@
+{
+  "@context": [
+    123
+  ],
+  "type": [
+    "VerifiableCredential",
+    "ClrCredential"
+  ],
+  "id": "https://clr.example/credentials/matrix-invalid",
+  "name": "Matrix CLR",
+  "credentialSubject": {
+    "id": "did:example:alice"
+  }
+}

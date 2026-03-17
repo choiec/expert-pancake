@@ -1,5 +1,6 @@
 pub mod graph;
 pub mod indexer;
+pub mod meili_indexer;
 pub mod repo;
 pub mod surreal_memory_query;
 pub mod surreal_memory_repo;

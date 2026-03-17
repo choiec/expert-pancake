@@ -73,4 +73,89 @@ path = "tests/contract/surreal_retention_contract.rs"
 name = "indexing_outbox_mapping_contract"
 path = "tests/contract/indexing_outbox_mapping_contract.rs"
 
+[[test]]
+name = "register_source_contract"
+path = "tests/contract/register_source_contract.rs"
+
+[[test]]
+name = "register_source_standard_errors"
+path = "tests/contract/register_source_standard_errors.rs"
+
+[[test]]
+name = "get_memory_item_contract"
+path = "tests/contract/get_memory_item_contract.rs"
+
+[[test]]
+name = "get_source_contract"
+path = "tests/contract/get_source_contract.rs"
+
+[[test]]
+name = "register_source_standard_validation_matrix"
+path = "tests/contract/register_source_standard_validation_matrix.rs"
+
+[[test]]
+name = "openapi_smoke"
+path = "tests/contract/openapi_smoke.rs"
+
+[[test]]
+name = "register_source_flow"
+path = "tests/integration/register_source_flow.rs"
+
+[[test]]
+name = "register_source_standard_flow"
+path = "tests/integration/register_source_standard_flow.rs"
+
+[[test]]
+name = "get_memory_item_flow"
+path = "tests/integration/get_memory_item_flow.rs"
+
+[[test]]
+name = "get_source_flow"
+path = "tests/integration/get_source_flow.rs"
+
+[[test]]
+name = "register_source_concurrency"
+path = "tests/integration/register_source_concurrency.rs"
+
+[[test]]
+name = "multi_instance_consistency"
+path = "tests/integration/multi_instance_consistency.rs"
+
+[[test]]
+name = "memory_ingest_vertical_slice"
+path = "tests/integration/memory_ingest_vertical_slice.rs"
+
+[[test]]
+name = "search_memory_items_contract"
+path = "tests/contract/search_memory_items_contract.rs"
+
+[[test]]
+name = "meilisearch_projection_contract"
+path = "tests/contract/meilisearch_projection_contract.rs"
+
+[[test]]
+name = "search_projection_flow"
+path = "tests/integration/search_projection_flow.rs"
+
+[[test]]
+name = "indexing_status_mapping_flow"
+path = "tests/integration/indexing_status_mapping_flow.rs"
+
+[[test]]
+name = "observability_tracing_flow"
+path = "tests/integration/observability_tracing_flow.rs"
+
+[[test]]
+name = "observability_metrics"
+path = "tests/integration/observability_metrics.rs"
+
+[[test]]
+name = "memory_ingest_slo"
+path = "tests/perf/memory_ingest_slo.rs"
+
+[[bench]]
+name = "memory_ingest_latency"
+path = "benches/memory_ingest_latency.rs"
+harness = false
+
 [dependencies]

@@ -1,0 +1,11 @@
+{
+  "@context": {
+    "unexpected": true
+  },
+  "type": [
+    "VerifiableCredential",
+    "OpenBadgeCredential"
+  ],
+  "id": "urn:example:badge:matrix-invalid",
+  "name": "Matrix Badge"
+}

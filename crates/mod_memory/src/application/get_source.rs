@@ -12,11 +12,15 @@ use crate::infra::repo::SourceQueryRepository;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceMemoryItemResult {
     pub urn: String,
+    pub source_id: Uuid,
     pub sequence: u32,
     pub unit_type: String,
     pub start_offset: u32,
     pub end_offset: u32,
+    pub version: String,
     pub content: String,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,11 +61,15 @@ impl GetSourceService {
                 .into_iter()
                 .map(|item| SourceMemoryItemResult {
                     urn: item.urn.to_string(),
+                    source_id: item.source_id,
                     sequence: item.sequence,
                     unit_type: item.unit_type.as_str().to_owned(),
                     start_offset: item.start_offset,
                     end_offset: item.end_offset,
+                    version: item.version,
                     content: item.content,
+                    created_at: item.created_at,
+                    updated_at: item.updated_at,
                 })
                 .collect(),
         })

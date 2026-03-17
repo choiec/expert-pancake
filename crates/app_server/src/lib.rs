@@ -15,6 +15,7 @@ use crate::{config::AppConfig, state::AppState};
 /// thin process wrapper and all HTTP routes inherit the common router middleware.
 pub async fn build_app(config: AppConfig) -> Result<(Router, AppState), StartupError> {
     let state = AppState::bootstrap(config).await?;
+    state.spawn_background_tasks();
     let router = router::build_router(state.clone());
 
     Ok((router, state))
