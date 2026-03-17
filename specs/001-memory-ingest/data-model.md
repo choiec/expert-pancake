@@ -78,6 +78,27 @@ Represents one normalized content unit derived from a `Source`.
 - Idempotent replay compares a deterministic normalized JSON hash of the validated standard payload, not the preserved raw-body bytes, so formatting-only changes replay to the first authoritative record.
 - Retrieval guarantees apply to the authoritative stored memory-item content. For direct-standard ingest, `GET /memory-items/{urn}` returns the preserved first-commit request body exactly as stored.
 
+## Verification-Critical Invariants
+
+### Standard-Payload Validation
+
+- A canonical `Source` may be created from a supported Open Badges or CLR request only after the pinned boundary schema passes and canonical mapping yields one deterministic non-empty trimmed `id` and `name` pair.
+- Shape-valid but unmappable payloads are rejected before any `Source`, `MemoryItem`, or `MemoryIndexJob` row exists.
+
+### Replay Hashing
+
+- `source_metadata.system.canonical_payload_hash` is the authoritative replay comparison input for standard payloads; it is derived from deterministic normalized JSON after validation and before idempotency comparison.
+- The preserved raw-body content and the replay hash serve different purposes: retrieval uses preserved content, while idempotency uses the normalized hash.
+
+### Outbox Mapping
+
+- `MemoryIndexJob` rows must contain the authoritative identifiers needed to rehydrate projection inputs from `Source` and `MemoryItem` rows without copying projection-only state into authoritative storage.
+- Public `indexing_status` is a derived contract field and never the durable internal job status itself.
+
+### Performance Gates
+
+- Performance evidence is operational rather than entity-native: endpoint metrics and benchmark fixtures must demonstrate the published latency and throughput targets for representative canonical and direct-standard workloads before rollout.
+
 ### Retrieval View / Projection
 
 Represents API-facing read models derived from authoritative rows.
@@ -139,6 +160,11 @@ Tracks durable indexing work for Meilisearch without making search availability 
 | `available_at` | timestamp | yes | Next eligible processing time |
 | `created_at` | timestamp | yes | Commit time |
 | `updated_at` | timestamp | yes | Last status change |
+
+#### Verification Notes
+
+- A committed `MemoryIndexJob` must be sufficient to locate the authoritative `Source` and all related `MemoryItem` rows required to rebuild the intended projection input.
+- Mapping correctness is satisfied only if projection documents can be rehydrated from authoritative rows without losing `urn`, `source_id`, `sequence`, `document_type`, `content_preview`, `content_hash`, `created_at`, or `updated_at` semantics.
 
 ## State Transitions
 

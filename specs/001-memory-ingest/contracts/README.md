@@ -30,6 +30,13 @@ This directory contains the public HTTP contract for the first memory-ingest ver
 - Storage-adapter contract tests must complement the public HTTP contract by verifying SurrealDB authoritative guarantees and Meilisearch projection guarantees required by the constitution.
 - Performance validation must use the instrumented metrics pipeline to measure p95/p99 latency and error rate against the published performance criteria.
 
+## Implementation Verification Checkpoints
+
+- **Standard-payload validation**: the contract is satisfied only when accepted, schema-invalid, and shape-valid-but-unmappable Open Badges and CLR payloads match the documented allow or reject outcomes and rejected requests create no authoritative state.
+- **Replay hashing**: the contract is satisfied only when formatting-only variants of the same validated standard payload replay to the same authoritative identifiers while retrieval still returns the preserved first-commit content exactly as stored.
+- **Outbox mapping**: the contract is satisfied only when external `indexing_status` values (`queued`, `indexed`, `deferred`) summarize authoritative-plus-outbox state correctly and internal job statuses remain implementation-only.
+- **Performance gates**: the contract is satisfied for release only when the published latency and error-rate criteria are asserted through the documented metrics and load-validation workflow.
+
 ## Contract File
 
 - `memory-ingest.openapi.yaml`: machine-readable OpenAPI 3.1 contract for the current slice.

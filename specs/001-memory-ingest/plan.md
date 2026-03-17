@@ -37,6 +37,30 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
 - No constitution violations were introduced by the design artifacts.
 - The only deferred area is durable retry implementation detail for indexing jobs, which is captured as an explicit open decision rather than hidden complexity.
 
+## Implementation Readiness Assessment
+
+- Artifact-wise, this feature is ready for implementation. No blocking artifact issue or unresolved cross-document ambiguity remains.
+- Residual risk is limited to implementation verification. Each remaining risk is tied below to the exact implementation activity and evidence required to close it.
+
+### Remaining Implementation Risks
+
+1. **Standard-payload validation**
+  - Spec anchors: FR-001, FR-002, FR-014, AC-F7, AC-V1, NC-012
+  - Implementation activity: keep Open Badges and CLR validation at the HTTP boundary, execute pinned-schema checks before canonical mapping, and reject any payload that cannot produce one deterministic non-empty trimmed `id` and `name` pair.
+  - Verification evidence: a validation matrix that proves accepted, schema-invalid, and shape-valid-but-unmappable payloads produce the documented allow or reject outcomes and never leave partial authoritative state.
+2. **Replay hashing**
+  - Spec anchors: FR-002, FR-005, AC-F2, AC-F3, AC-V2
+  - Implementation activity: compute a deterministic normalized JSON hash for supported standard payloads independently from the preserved raw-body content, compare that hash on replay, and preserve first-commit retrieval content unchanged.
+  - Verification evidence: deterministic hash fixtures plus replay and conflict scenarios showing same-hash idempotency, preserved-content retrieval, and conflict detection for semantic changes.
+3. **Outbox mapping**
+  - Spec anchors: FR-006, FR-008, FR-009, AC-F1, AC-R2, AC-V3, NC-007
+  - Implementation activity: commit authoritative rows and `memory_index_job` in one transaction, rehydrate projection documents from authoritative storage, and map internal outbox states to public `indexing_status` without leaking internal vocabulary.
+  - Verification evidence: contract and integration coverage proving that the outbox record contains the authoritative keys needed to reconstruct projection inputs and that external responses summarize indexing state only as `queued`, `indexed`, or `deferred`.
+4. **Performance gates**
+  - Spec anchors: AC-P1, AC-P2, AC-P3, AC-V4, NC-001, NC-002, NC-003, NC-004, NC-009
+  - Implementation activity: instrument endpoint latency and error-rate metrics, execute benchmark and load suites over representative canonical and direct-standard fixtures, and treat threshold assertions as release gates.
+  - Verification evidence: reproducible benchmark or load reports showing p95 or p99 latency, throughput, and error-rate measurements against the published thresholds.
+
 ## Architecture / Components
 
 ### Request Flow
@@ -311,10 +335,12 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
   - deterministic URN generation
   - canonical payload hashing and conflict detection
   - normalized JSON hashing for standard-payload replay despite raw-body formatting differences
+  - standard-payload validation allow or reject matrix coverage for accepted, schema-invalid, and shape-valid-but-unmappable inputs
   - error mapping from domain/application errors to HTTP contract
 - **Integration tests**:
   - full ingest -> persist -> retrieve flow against disposable SurrealDB and Meilisearch instances
   - Open Badges happy path, CLR happy path, standard replay, standard conflict, invalid-standard-schema, and shape-valid-but-unmappable flows
+  - preserved-content retrieval after formatting-only replay to prove raw-body preservation and replay-hash determinism remain aligned
   - search degraded mode where Meilisearch is unavailable but registration succeeds
   - readiness behavior with database down vs search down
 - **API contract tests**:
@@ -323,7 +349,7 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
   - assert the distinct liveness versus readiness schemas
 - **Storage adapter contract tests**:
   - SurrealDB uniqueness, transaction rollback behavior, no-TTL retention baseline, and write-path readiness probe behavior
-  - outbox durability and retry status transitions
+  - outbox durability, authoritative-to-projection mapping correctness, and retry status transitions
   - Meilisearch projection schema, filter settings, and sort behavior
 - **Concurrency tests**:
   - duplicate registration races for identical and conflicting payloads
@@ -333,7 +359,7 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
   - benchmark registration latency with representative canonical markdown payloads under 100 KB and direct-standard JSON payloads under 100 KB
   - benchmark retrieval latency for single-item and 10k-item source scenarios
   - benchmark search latency against a representative 1M-document projection corpus or replayable synthetic fixture
-  - capture p95/p99 latency, throughput, and error rate from Prometheus-compatible metrics and fail the gate when AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, or NC-004 are exceeded
+  - capture p95/p99 latency, throughput, and error rate from Prometheus-compatible metrics and fail the gate when AC-P1, AC-P2, AC-P3, AC-V4, NC-001, NC-002, NC-003, or NC-004 are exceeded
 
 ## Rollout / Migration Notes
 
@@ -341,12 +367,14 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
 - Startup should bootstrap SurrealDB schema, uniqueness constraints, and Meilisearch index settings idempotently.
 - Route registration can be gated behind a dedicated `memory_ingest` config flag until the slice is validated in staging.
 - Because search is non-authoritative, a simple re-index worker can rebuild Meilisearch from SurrealDB plus outbox state if search data is lost.
+- Release readiness for this slice requires explicit verification evidence for standard-payload validation, replay hashing determinism, authoritative outbox mapping, and published performance gates.
 - Future FalkorDB rollout should consume the same canonical projection events instead of changing the current write or retrieval contracts.
 
-## Open Risks and Decisions
+## Residual Implementation Risk Statement
 
-- **Risk**: large markdown documents with pathological heading density could create very large memory-item batches; implementation should cap per-batch sizes while preserving deterministic ordering.
-- **Risk**: SurrealDB transaction semantics and error shapes need adapter contract tests early because idempotency and rollback depend on precise behavior.
+- No blocking artifact issue remains.
+- Remaining risk is implementation-only and is explicitly limited to standard-payload validation, replay hashing, outbox mapping, and performance-gate verification.
+- Implementation should not be considered complete until the verification evidence listed in this plan exists for each risk area.
 
 ## Project Structure
 

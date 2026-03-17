@@ -22,6 +22,30 @@ This slice includes first-class ingest support for Open Badges and CLR JSON payl
 - Q: How are accepted Open Badges and CLR payloads canonicalized for authoritative storage? → A: They are stored as canonical `Source` records with `document_type = json`; the accepted UTF-8 request body is preserved exactly as received and emitted as a single derived `json_document` memory item spanning the full payload.
 - Q: How do exact-content guarantees interact with idempotent replay for direct standard ingest? → A: Retrieval returns the first committed authoritative content exactly as stored; replay detection uses a deterministic normalized JSON hash of the validated payload so formatting-only changes do not create duplicate authoritative records.
 
+## Readiness Assessment
+
+- Artifact-wise, this feature is implement-ready: no artifact-level ambiguity or blocking issue remains across spec, plan, tasks, data model, contracts, research, or quickstart.
+- The only remaining risk is implementation risk. That risk is intentionally narrowed to documented verification work for the four areas below.
+
+### Remaining Implementation Risks
+
+1. **Standard-payload validation**
+  - Requirement anchors: FR-001, FR-002, FR-014, AC-F7, NC-012
+  - Invariant: only payloads that satisfy the pinned Open Badges or CLR boundary schema and deterministically map to canonical `external_id` and `title` may create authoritative state.
+  - Verification target: implementation must prove that documented allow and reject criteria match contract behavior for accepted, schema-invalid, and shape-valid-but-unmappable payloads.
+2. **Replay hashing**
+  - Requirement anchors: FR-002, FR-005, AC-F2, AC-F3
+  - Invariant: idempotency for supported standard payloads is decided from a deterministic normalized JSON hash of the validated payload, while retrieval preserves the first committed UTF-8 request body exactly as stored.
+  - Verification target: implementation must prove that formatting-only replays resolve to the same authoritative identifiers and preserved content, while semantically different payloads with the same `external_id` produce HTTP 409.
+3. **Outbox mapping**
+  - Requirement anchors: FR-006, FR-008, FR-009, AC-F1, AC-R2, NC-007
+  - Invariant: authoritative `Source` and `MemoryItem` writes remain the source of truth, and each committed indexing job must map to projection inputs without semantic loss while external `indexing_status` exposes only `queued`, `indexed`, or `deferred`.
+  - Verification target: implementation must prove that outbox records can rehydrate the intended search projection from authoritative rows and that internal job states never leak through public API responses.
+4. **Performance gates**
+  - Requirement anchors: AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, NC-004, NC-009
+  - Invariant: published latency and throughput targets are release gates for this slice, not informal aspirations.
+  - Verification target: implementation must prove, with instrumented measurements and threshold assertions, that representative canonical and direct-standard workloads satisfy the documented performance criteria.
+
 ## Goals
 
 - **G1**: Establish a reliable HTTP API for registering source documents
@@ -205,6 +229,14 @@ The system maintains a search-friendly projection of memory items in Meilisearch
 
 - **AC-F7**: Valid Open Badges and CLR payloads are accepted as direct ingest requests, produce `document_type = json` plus one `json_document` memory item, and invalid or shape-valid-but-unmappable standard payloads return HTTP 400 without partial persistence.
 
+- **AC-V1**: Standard-payload validation correctness is verified when the documented allow and reject criteria for Open Badges and CLR requests are shown to match boundary behavior across accepted payloads, schema-invalid payloads, and shape-valid-but-unmappable payloads.
+
+- **AC-V2**: Replay hashing determinism and idempotency are verified when semantically equivalent validated standard payloads produce the same canonical payload hash, `source_id`, and memory-item URNs across replays, while semantically different payloads with the same `external_id` return HTTP 409.
+
+- **AC-V3**: Outbox mapping correctness is verified when each committed source registration yields durable indexing work that can rehydrate the intended projection inputs from authoritative `Source` and `MemoryItem` rows without semantic loss, and public `indexing_status` values remain limited to `queued`, `indexed`, and `deferred`.
+
+- **AC-V4**: Performance gates are verified when representative registration, retrieval, and search workloads are executed against the instrumented metrics pipeline and fail the release gate if the published latency, throughput, or error-rate thresholds are exceeded.
+
 - **AC-P1**: Registration (including normalization and persistence) completes in under 5 seconds p95 for typical documents (< 100 KB).
 
 - **AC-P2**: Memory item retrieval completes in under 200 ms p95.
@@ -298,4 +330,4 @@ The system maintains a search-friendly projection of memory items in Meilisearch
 ---
 
 **Status**: IMPLEMENT-READY  
-**Quality Gate**: Direct-standard canonicalization, indexing-status vocabulary, task coverage, and performance validation planning are aligned across the feature artifacts.
+**Quality Gate**: Artifact-wise ready; no blocking artifact issue remains. Residual risk is implementation-only and is explicitly tracked as standard-payload validation, replay hashing, outbox mapping, and performance-gate verification.

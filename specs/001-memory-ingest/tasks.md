@@ -11,6 +11,7 @@
 - The current repository is skeletal, so early tasks intentionally normalize the Rust workspace and add the missing `mod_memory` crate boundary described in the plan.
 - Search remains non-authoritative: Meilisearch work is required for this slice, but write-path success still depends only on SurrealDB.
 - Every published public endpoint and published status code in the OpenAPI contract must map to an explicit contract-testing task; implicit coverage is not sufficient for this slice.
+- Artifact-level ambiguity is closed. Remaining risk is implementation verification only, and task coverage must make standard-payload validation, replay hashing, outbox mapping, and performance gates explicit rather than implied.
 
 ## Dependency Notes
 
@@ -407,8 +408,32 @@ Outcome: The feature has an executable performance validation plan tied to the p
 Dependencies: T017, T021, T025, T030, T038.
 Relevant inputs: spec.md AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, NC-004; plan.md Performance validation strategy; quickstart.md Suggested Local Validation Sequence.
 Constraints: Measure p95/p99 latency, throughput, and error rate for representative payloads and data shapes: canonical markdown under 100 KB, direct-standard Open Badges/CLR JSON under 100 KB, retrieval of a 10k-item source, and search against a representative 1M-item projection corpus or replayable synthetic fixture. Use Prometheus-compatible metrics emitted by T038 as the primary capture path and define pass/fail thresholds for each published performance requirement.
-Done-when: The repository contains an automatable benchmark/load suite that fails when AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, or NC-004 are exceeded and emits a reproducible report of p95/p99 latency, throughput, and error rate.
-Traceability: AC-P1; AC-P2; AC-P3; NC-001; NC-002; NC-003; NC-004; NC-009.
+Done-when: The repository contains an automatable benchmark/load suite that fails the release gate when AC-P1, AC-P2, AC-P3, AC-V4, NC-001, NC-002, NC-003, or NC-004 are exceeded and emits a reproducible report of p95/p99 latency, throughput, and error rate.
+Traceability: AC-P1; AC-P2; AC-P3; AC-V4; NC-001; NC-002; NC-003; NC-004; NC-009.
+
+- [ ] T045 [P] Add explicit standard-payload validation correctness verification in tests/contract/register_source_standard_validation_matrix.rs and tests/fixtures/register_source/validation_matrix/*.json
+Outcome: The documented allow and reject rules for Open Badges and CLR direct ingest are pinned as executable verification coverage rather than left implicit across existing contract tests.
+Dependencies: T017.
+Relevant inputs: spec.md FR-001, FR-002, FR-014, AC-F7, AC-V1; plan.md Remaining Implementation Risks; contracts/memory-ingest.openapi.yaml `/sources/register`.
+Constraints: Cover accepted payloads, pinned-schema failures, and shape-valid-but-unmappable payloads for both supported standard families; assert that only canonical-mappable payloads can create authoritative state and that rejected payloads produce the documented `400` semantics.
+Done-when: Verification coverage fails until the implementation proves standard-payload validation behavior matches the documented allow and reject matrix exactly.
+Traceability: FR-001; FR-002; FR-014; AC-F7; AC-V1; NC-012.
+
+- [ ] T046 [P] Add replay hashing determinism and idempotency verification in tests/unit/normalized_json_hash.rs, tests/integration/register_source_replay_hashing.rs, and tests/fixtures/register_source/replay_hashing/*.json
+Outcome: Replay behavior for supported standard payloads is verified directly against the normalized-hash rule and preserved-content retrieval guarantee.
+Dependencies: T016, T017, T021.
+Relevant inputs: spec.md FR-002, FR-005, AC-F2, AC-F3, AC-V2; plan.md Remaining Implementation Risks; data-model.md Canonicalization Rules.
+Constraints: Prove that formatting-only variants of the same validated payload produce the same canonical payload hash and authoritative identifiers, that the first committed raw body remains the retrieval payload, and that semantic changes still yield `409 Conflict`.
+Done-when: Verification coverage fails until replay hashing is demonstrably deterministic for equivalent payload semantics and conflict-producing for semantic divergence.
+Traceability: FR-002; FR-005; AC-F2; AC-F3; AC-V2.
+
+- [ ] T047 [P] Add authoritative outbox-to-projection mapping verification in tests/contract/indexing_outbox_mapping_contract.rs and tests/integration/indexing_status_mapping_flow.rs
+Outcome: The durable indexing path is verified as a semantic mapping from authoritative rows to projection inputs, with public status translation checked independently from worker internals.
+Dependencies: T015, T029, T030.
+Relevant inputs: spec.md FR-006, FR-008, FR-009, AC-F1, AC-R2, AC-V3; plan.md Remaining Implementation Risks; data-model.md MemoryIndexJob and Public `indexing_status` Mapping.
+Constraints: Assert that committed outbox records contain the authoritative keys needed to reconstruct projection documents, that projection inputs can be rehydrated without semantic loss from `Source` and `MemoryItem` rows, and that external responses expose only `queued`, `indexed`, or `deferred`.
+Done-when: Verification coverage fails until outbox persistence, projection rehydration, and public `indexing_status` mapping all match the documented contract.
+Traceability: FR-006; FR-008; FR-009; AC-F1; AC-R2; AC-V3; NC-007.
 
 - [ ] T040 [P] Add concurrency and multi-instance validation in tests/integration/register_source_concurrency.rs and tests/integration/multi_instance_consistency.rs
 Outcome: Horizontal-scale and duplicate-registration guarantees are verified explicitly rather than inferred from unit behavior.
@@ -490,6 +515,9 @@ Traceability: G6; G7; constitution Documentation & Runbooks.
 - {T008, T017, T021, T025, T030} -> T031
 - {T009, T018, T022, T026, T034, T017, T021, T025, T030} -> T032
 - {T002, T008, T017, T021, T025, T030} -> T033 -> T041
+- T017 -> T045
+- {T016, T017, T021} -> T046
+- {T015, T029, T030} -> T047
 
 ## Parallel Opportunities
 
@@ -498,7 +526,7 @@ Traceability: G6; G7; constitution Documentation & Runbooks.
 - US1: T009, T010, T035, T042, and T043 can run in parallel; T011 and T012 can run in parallel.
 - US2 and US3 test authoring can start in parallel after T017 because both rely on a working registration path for fixtures.
 - US4: T026, T027, and T037 can run in parallel while adapter work is being defined.
-- Cross-cutting validation T039, T040, and T044 can run in parallel once the relevant runtime hooks exist.
+- Cross-cutting validation T039, T040, T044, T045, T046, and T047 can run in parallel once the relevant runtime hooks exist.
 - Documentation T033 and T041 can begin once the route set and outbox behavior are stable, in parallel with final validation T031-T032.
 
 ## Parallel Example: MVP Track
@@ -518,6 +546,7 @@ T012  MemoryItem aggregate and normalization rules
 1. Complete Phase 1 and Phase 2.
 2. Complete all US1 tasks through T017 plus T035-T036.
 3. Run T009-T010 and validate the registration slice before adding retrieval work.
+4. Do not declare the slice complete until T044, T045, T046, and T047 close the remaining implementation verification risks called out in the spec and plan.
 
 ### Incremental Delivery
 

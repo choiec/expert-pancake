@@ -81,6 +81,13 @@ Expected response shape:
 - The accepted UTF-8 request body is preserved exactly as stored content and emitted through one derived `json_document` memory item.
 - Formatting-only replay of the same validated standard payload reuses the first authoritative record because replay detection uses normalized JSON hashing rather than raw-body bytes.
 
+## Implementation Verification Checkpoints
+
+- **Standard-payload validation**: verify that accepted, schema-invalid, and shape-valid-but-unmappable Open Badges and CLR fixtures produce the documented `201` or `200` versus `400` outcomes and leave no authoritative state on rejection.
+- **Replay hashing**: verify that formatting-only variants of the same validated standard payload return the same `source_id` and URNs while retrieval still returns the preserved first-commit request body exactly as stored.
+- **Outbox mapping**: verify that a successful registration creates durable indexing work tied to authoritative identifiers and that external responses summarize indexing progress only as `queued`, `indexed`, or `deferred`.
+- **Performance gates**: verify that the benchmark or load suite asserts the published latency and throughput thresholds before staging or rollout.
+
 ## Smoke Test: Open Badges / CLR Direct Ingest
 
 ```bash
@@ -126,6 +133,7 @@ Expected behavior:
 - Public API responses summarize those internal job states as `queued`, `indexed`, or `deferred`; internal outbox vocabulary is never returned directly to clients.
 - Retry exhaustion must promote jobs to `dead_letter` without affecting authoritative source or memory-item availability.
 - Manual recovery must support re-indexing from authoritative SurrealDB data by replaying source identifiers from the outbox rather than depending on stale Meilisearch state.
+- Performance validation is part of operational readiness for this slice: emitted metrics and benchmark or load reports must be retained as evidence that AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, and NC-004 were checked.
 
 ## Suggested Local Validation Sequence
 
@@ -139,5 +147,7 @@ Expected behavior:
 8. Submit a conflicting payload with the same `external-id` and verify `409 Conflict`.
 9. Register one Open Badges payload and one CLR payload, then verify each returns `document_type = json`, one `json_document` item, and exact-content retrieval.
 10. Submit one schema-invalid standard payload and one shape-valid-but-unmappable standard payload and verify both return `400` without persistence.
-11. Confirm `/health` stays `200` when dependencies are down while `/ready` reflects authoritative write-path availability.
-12. Run the benchmark/load suite and confirm the emitted p95/p99 metrics satisfy AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, and NC-004 before staging rollout.
+11. Replay a formatting-only variant of a successful direct-standard payload and verify the same authoritative identifiers are returned while retrieval still exposes the first committed body.
+12. Inspect the corresponding authoritative outbox state and verify public `indexing_status` remains limited to `queued`, `indexed`, or `deferred`.
+13. Confirm `/health` stays `200` when dependencies are down while `/ready` reflects authoritative write-path availability.
+14. Run the benchmark/load suite and confirm the emitted p95/p99 metrics satisfy AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, and NC-004 before staging rollout.

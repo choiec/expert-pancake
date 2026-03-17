@@ -4,6 +4,12 @@
 
 These research decisions are ratified for implementation by `/workspaces/rust/specs/001-memory-ingest/adr/0001-direct-standard-ingest.md`.
 
+## Implementation Readiness Note
+
+- Artifact-level ambiguity is resolved for this slice. There is no remaining blocking artifact issue.
+- Residual risk is implementation-only and is intentionally constrained to four verification areas: standard-payload validation, replay hashing, outbox mapping, and performance gates.
+- The decisions below should therefore be read as implementation constraints plus verification targets, not as unresolved design questions.
+
 ## Decision 1: Layer the slice as handler -> application/service -> repository/indexing ports
 
 - **Decision**: Keep Axum handlers in `app_server` as thin HTTP adapters and move all ingest, retrieval, and search orchestration into a dedicated `mod_memory` application layer backed by repository and indexing traits.
@@ -72,3 +78,13 @@ These research decisions are ratified for implementation by `/workspaces/rust/sp
 - **Decision**: Capture the initial API in an OpenAPI contract under `contracts/`, verify implementation against it with contract tests for every published endpoint and status code, and pair that suite with explicit SurrealDB and Meilisearch adapter contract tests.
 - **Rationale**: The constitution requires machine-readable public contracts and storage-adapter verification, and the repository is still skeletal enough that the contracts should lead implementation rather than trail it.
 - **Alternatives considered**: Markdown-only endpoint documentation was rejected because it is less precise and less testable.
+
+## Decision 12: Treat residual risk as explicit implementation verification gates
+
+- **Decision**: Keep the slice marked implement-ready while documenting the remaining risk strictly as implementation verification work for standard-payload validation, replay hashing, outbox mapping, and performance gates.
+- **Rationale**: Artifact readiness should not be confused with runtime readiness. Converting the residual risk into explicit verification gates preserves traceability without reopening design scope.
+- **Verification implication**:
+	- Standard-payload validation must prove documented allow or reject behavior.
+	- Replay hashing must prove deterministic idempotency without changing preserved retrieval content.
+	- Outbox mapping must prove projection inputs derive from authoritative rows without semantic loss.
+	- Performance gates must prove the published thresholds through reproducible measurements.

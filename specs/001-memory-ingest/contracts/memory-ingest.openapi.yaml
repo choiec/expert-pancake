@@ -284,6 +284,7 @@ components:
       description: Boundary DTO validated against the repository-pinned CLR credential envelope schema for this slice. If the payload passes envelope validation but cannot be mapped deterministically into canonical title and external_id, the request fails with 400. Successful requests are persisted with `document_type = json` and one `json_document` memory item.
     RegisterSourceResponse:
       type: object
+      description: Successful registration or idempotent replay response. For supported direct-standard ingest, success implies the payload passed the pinned boundary schema and canonical mapping checks; replay acceptance is decided from the documented canonical payload hash semantics rather than raw-body byte equality.
       required:
         - source_id
         - external_id
@@ -321,6 +322,7 @@ components:
           $ref: '#/components/schemas/MemoryUnitType'
     SourceResponse:
       type: object
+      description: Authoritative source retrieval response. `indexing_status` is a public summary of indexing progress derived from authoritative and outbox state; internal outbox vocabulary is not exposed.
       required:
         - source_id
         - external_id
@@ -371,6 +373,7 @@ components:
           minimum: 0
         content:
           type: string
+          description: Authoritative stored content. For direct-standard `json_document` items, this is the preserved UTF-8 request body from the first successful registration for that `external_id`.
         item_metadata:
           type: object
           required:
@@ -451,7 +454,7 @@ components:
           format: float
     IndexingStatus:
       type: string
-      description: Public indexing progress vocabulary only. Internal outbox job states are not exposed.
+      description: Public indexing progress vocabulary only. `queued` means authoritative persistence succeeded and durable indexing work is accepted but not yet confirmed in search, `indexed` means the projection is confirmed available, and `deferred` means authoritative persistence succeeded but search confirmation is delayed or degraded. Internal outbox job states are not exposed.
       enum: [queued, indexed, deferred]
     MemoryUnitType:
       type: string
