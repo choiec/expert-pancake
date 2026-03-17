@@ -1,0 +1,22 @@
+services:
+	surrealdb:
+		image: surrealdb/surrealdb:latest
+		command:
+			- start
+			- --log
+			- info
+			- --user
+			- root
+			- --pass
+			- root
+			- memory
+		ports:
+			- "8000:8000"
+
+	meilisearch:
+		image: getmeili/meilisearch:v1.13
+		environment:
+			MEILI_MASTER_KEY: local-dev-key
+		ports:
+			- "7700:7700"
+

@@ -1,0 +1,7 @@
+{
+  "issuer": {
+    "id": "https://issuer.example.org"
+  },
+  "name": "Rust Badge",
+  "id": "urn:badge:001"
+}

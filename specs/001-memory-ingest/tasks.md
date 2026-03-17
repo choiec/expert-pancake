@@ -27,7 +27,7 @@
 
 **Purpose**: Normalize the Rust workspace and create the crate boundaries required by the plan.
 
-- [ ] T001 Align Rust workspace manifest and scaffold the memory ingest crate in Cargo.toml, crates/mod_memory/Cargo.toml, crates/mod_memory/src/lib.rs, crates/mod_memory/src/application/mod.rs, crates/mod_memory/src/domain/mod.rs, crates/mod_memory/src/infra/mod.rs
+- [X] T001 Align Rust workspace manifest and scaffold the memory ingest crate in Cargo.toml, crates/mod_memory/Cargo.toml, crates/mod_memory/src/lib.rs, crates/mod_memory/src/application/mod.rs, crates/mod_memory/src/domain/mod.rs, crates/mod_memory/src/infra/mod.rs
 Outcome: The repository becomes a proper Cargo workspace with a dedicated `mod_memory` crate matching the plan's application/domain/infra split.
 Dependencies: None.
 Relevant inputs: plan.md Architecture / Components; research.md Decision 1; user requirement `Rust workspace / crate 구조 정리`.
@@ -35,7 +35,7 @@ Constraints: Preserve existing crate boundaries; do not move unrelated feature c
 Done-when: `cargo metadata` can resolve the workspace members and the new `mod_memory` crate is an addressable package target.
 Traceability: Foundation for US1-US4; FR-014; constitution Architecture Boundaries.
 
-- [ ] T002 Configure shared crate dependencies and local infrastructure defaults in crates/app_server/Cargo.toml, crates/core_shared/Cargo.toml, crates/core_infra/Cargo.toml, crates/mod_memory/Cargo.toml, docker-compose.yaml
+- [X] T002 Configure shared crate dependencies and local infrastructure defaults in crates/app_server/Cargo.toml, crates/core_shared/Cargo.toml, crates/core_infra/Cargo.toml, crates/mod_memory/Cargo.toml, docker-compose.yaml
 Outcome: All participating crates declare the dependencies from the plan, and local SurrealDB/Meilisearch startup matches the quickstart environment.
 Dependencies: T001.
 Relevant inputs: plan.md Technical Context; quickstart.md Proposed Environment Variables and Start Infrastructure.
@@ -51,7 +51,7 @@ Traceability: US1-US4 enablement; FR-008; FR-011; NC-007.
 
 **Critical**: No user-story endpoint work should begin until this phase is complete.
 
-- [ ] T003 Implement environment/config loading in crates/app_server/src/config.rs and crates/core_infra/src/setup.rs
+- [X] T003 Implement environment/config loading in crates/app_server/src/config.rs and crates/core_infra/src/setup.rs
 Outcome: Runtime configuration is loaded from environment variables into typed config structs for HTTP, SurrealDB, Meilisearch, limits, and timeouts.
 Dependencies: T002.
 Relevant inputs: quickstart.md Proposed Environment Variables; plan.md Storage / State / API Decisions.
@@ -59,7 +59,7 @@ Constraints: Secrets must remain environment-injected; body size and timeout set
 Done-when: The app can construct validated config objects without hard-coded credentials, and missing required settings produce structured startup failures.
 Traceability: FR-002; FR-011; NC-001; constitution Secrets/config separation.
 
-- [ ] T004 [P] Create the common domain error model in crates/core_shared/src/error.rs and crates/core_shared/src/lib.rs
+- [X] T004 [P] Create the common domain error model in crates/core_shared/src/error.rs and crates/core_shared/src/lib.rs
 Outcome: Canonical error types exist for validation, conflict, timeout, not-found, storage, and search-degraded cases, ready for HTTP mapping and service composition.
 Dependencies: T001.
 Relevant inputs: spec.md FR-007, FR-012; plan.md Error Contract; repo memory fact about explicit error types.
@@ -67,7 +67,7 @@ Constraints: Errors must be structured and protocol-neutral; no HTTP-specific st
 Done-when: Shared error enums/structs cover all contract-level failures needed by the slice and are exported from `core_shared`.
 Traceability: US1-US4; FR-007; FR-012; constitution Explicit error types.
 
-- [ ] T005 Implement app bootstrap, router assembly, and shared state wiring in crates/app_server/src/main.rs and crates/app_server/src/state.rs
+- [X] T005 Implement app bootstrap, router assembly, and shared state wiring in crates/app_server/src/main.rs and crates/app_server/src/state.rs
 Outcome: The Axum server boots with typed application state, config, repository/indexing dependencies, and background-task handles.
 Dependencies: T002, T003.
 Relevant inputs: plan.md Request Flow and Handler sections; research.md Decision 1 and Decision 10.
@@ -75,7 +75,7 @@ Constraints: Handlers must stay thin; no business logic in `main.rs`; bootstrap 
 Done-when: `main.rs` builds the app from injected dependencies instead of printing a placeholder message.
 Traceability: US1-US4; G1; G6; constitution Layered handler/service/repository separation.
 
-- [ ] T006 Implement request-id, trace-context, and HTTP error mapping middleware in crates/app_server/src/middleware.rs
+- [X] T006 Implement request-id, trace-context, and HTTP error mapping middleware in crates/app_server/src/middleware.rs
 Outcome: Every request gets request correlation, W3C trace propagation, structured logging hooks, and canonical JSON error responses.
 Dependencies: T003, T004, T005.
 Relevant inputs: spec.md FR-010, FR-012, FR-013; plan.md Handler responsibilities and Error Contract.
@@ -83,7 +83,7 @@ Constraints: Do not log raw content payloads or arbitrary metadata; preserve pro
 Done-when: Route handlers can return service errors and receive consistent JSON error bodies with `error_code`, `message`, `details`, `timestamp`, and `request_id`.
 Traceability: US1-US4; FR-010; FR-012; FR-013; NC-011.
 
-- [ ] T007 [P] Implement SurrealDB and Meilisearch client bootstrap plus readiness probes in crates/core_infra/src/surrealdb.rs, crates/core_infra/src/meilisearch.rs, crates/core_infra/src/setup.rs
+- [X] T007 [P] Implement SurrealDB and Meilisearch client bootstrap plus readiness probes in crates/core_infra/src/surrealdb.rs, crates/core_infra/src/meilisearch.rs, crates/core_infra/src/setup.rs
 Outcome: Infrastructure adapters can connect with bounded timeouts, perform lightweight readiness checks, and expose reusable clients to the application.
 Dependencies: T002, T003.
 Relevant inputs: plan.md Repository and Indexing Adapter sections; research.md Decision 3, Decision 7, Decision 8.
@@ -91,7 +91,7 @@ Constraints: SurrealDB readiness must represent write-path availability; Meilise
 Done-when: The app can create typed SurrealDB and Meilisearch clients and independently report database/search component status.
 Traceability: US1-US4; FR-008; FR-011; NC-007.
 
-- [ ] T008 Implement health and readiness handlers with router wiring in crates/app_server/src/handlers/health.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
+- [X] T008 Implement health and readiness handlers with router wiring in crates/app_server/src/handlers/health.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
 Outcome: `/health` is available as a local-only liveness probe, and `/ready` is available as a dependency-aware readiness probe with explicit service/database/search status.
 Dependencies: T005, T006, T007.
 Relevant inputs: spec.md User Story 4 context, FR-011; plan.md REST Endpoints and Readiness semantics.
@@ -99,7 +99,7 @@ Constraints: `/health` must stay fast, return 200 without probing external depen
 Done-when: The router exposes both endpoints with the JSON shape defined in the OpenAPI contract and plan.
 Traceability: G6; FR-011; AC-O2.
 
-- [ ] T034 [P] Add OpenAPI-backed contract validation for GET /health and GET /ready in tests/contract/health_readiness_contract.rs
+- [X] T034 [P] Add OpenAPI-backed contract validation for GET /health and GET /ready in tests/contract/health_readiness_contract.rs
 Outcome: The probe endpoints' distinct schemas and status-code matrices are pinned to the published contract before implementation proceeds.
 Dependencies: T008.
 Relevant inputs: contracts/memory-ingest.openapi.yaml `/health`, `/ready`; spec.md FR-011, NC-010.
@@ -151,7 +151,7 @@ Constraints: Cover pinned JSON Schema validation failure -> `400`, shape-valid b
 Done-when: Unit/contract coverage fails until schema-invalid and unmappable standard payloads are distinguished correctly and returned as structured `400` responses.
 Traceability: US1; FR-001; FR-002; AC-F7; constitution API contract tests.
 
-- [ ] T035 [P] [US1] Add SurrealDB storage-adapter contract coverage in tests/contract/surreal_source_store_contract.rs, tests/contract/surreal_memory_store_contract.rs, and tests/contract/surreal_retention_contract.rs
+- [x] T035 [P] [US1] Add SurrealDB storage-adapter contract coverage in tests/contract/surreal_source_store_contract.rs, tests/contract/surreal_memory_store_contract.rs, and tests/contract/surreal_retention_contract.rs
 Outcome: The authoritative storage adapter's guarantees are pinned before implementation details diverge.
 Dependencies: T007.
 Relevant inputs: constitution Storage adapter verification; plan.md Storage adapter contract tests; spec.md FR-002, FR-004, NC-006, NC-016.
@@ -161,7 +161,7 @@ Traceability: US1; FR-002; FR-004; NC-006; NC-016; constitution Storage adapter 
 
 ### Implementation for User Story 1
 
-- [ ] T011 [P] [US1] Define the Source aggregate and canonical registration command in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/application/register_source.rs
+- [x] T011 [P] [US1] Define the Source aggregate and canonical registration command in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/application/register_source.rs
 Outcome: Canonical source types, idempotency-relevant fields, and registration command structures exist independently of HTTP DTOs.
 Dependencies: T004.
 Relevant inputs: data-model.md Source; spec.md FR-001, FR-014; plan.md Domain Model and Application / Service sections.
@@ -169,7 +169,7 @@ Constraints: Keep protocol-specific Open Badges/CLR concerns out of canonical do
 Done-when: The domain model can represent a validated canonical source registration, including direct-standard `json` sources and replay hashes, without referencing Axum, OpenAPI, or storage DTOs.
 Traceability: US1; FR-001; FR-014; constitution Canonical domain model first.
 
-- [ ] T012 [P] [US1] Define the MemoryItem aggregate and normalization rules in crates/mod_memory/src/domain/memory_item.rs and crates/mod_memory/src/domain/normalization.rs
+- [x] T012 [P] [US1] Define the MemoryItem aggregate and normalization rules in crates/mod_memory/src/domain/memory_item.rs and crates/mod_memory/src/domain/normalization.rs
 Outcome: Canonical memory-item entities and deterministic normalization logic exist for text, markdown, and empty-content placeholder cases.
 Dependencies: T004.
 Relevant inputs: data-model.md Memory Item; spec.md FR-003; research.md Decision 5 and Decision 6.
@@ -177,7 +177,7 @@ Constraints: Preserve stable `sequence`, deterministic URN seeds, immutable cont
 Done-when: Domain normalization can derive ordered `MemoryItem` values from canonical source content with offsets, hashes, and unit types for `text`, `markdown`, `json_document`, and placeholder cases.
 Traceability: US1; FR-003; AC-F1; AC-F6.
 
-- [ ] T013 [US1] Define repository and indexing port traits in crates/mod_memory/src/infra/repo.rs and crates/mod_memory/src/infra/indexer.rs
+- [x] T013 [US1] Define repository and indexing port traits in crates/mod_memory/src/infra/repo.rs and crates/mod_memory/src/infra/indexer.rs
 Outcome: Application services depend on explicit source, memory-item, query, and indexing ports instead of concrete storage clients.
 Dependencies: T011, T012.
 Relevant inputs: plan.md Repository and Indexing Adapter sections; research.md Decision 1 and Decision 7.
@@ -185,7 +185,7 @@ Constraints: Ports must separate authoritative persistence from non-authoritativ
 Done-when: `mod_memory` exposes traits for source persistence, memory-item persistence, query access, and indexing/outbox interaction.
 Traceability: US1; FR-004; FR-008; constitution Layered handler/service/repository separation.
 
-- [ ] T036 [US1] Define GraphProjectionPort and a NoopGraphProjectionAdapter in crates/mod_memory/src/infra/graph.rs, crates/mod_memory/src/domain/event.rs, and crates/core_infra/src/falkordb.rs
+- [x] T036 [US1] Define GraphProjectionPort and a NoopGraphProjectionAdapter in crates/mod_memory/src/infra/graph.rs, crates/mod_memory/src/domain/event.rs, and crates/core_infra/src/falkordb.rs
 Outcome: The future FalkorDB boundary is executable in this slice without adding graph runtime behavior or coupling current retrieval/write paths to graph concerns.
 Dependencies: T013.
 Relevant inputs: spec.md FR-015; plan.md Future Graph Boundary; research.md Decision 9.
@@ -193,7 +193,7 @@ Constraints: Use canonical identifiers only, keep the adapter no-op in this slic
 Done-when: The application can emit graph projection events to a no-op boundary that preserves the additive expansion contract for future graph work.
 Traceability: US1; FR-015; constitution Storage responsibility separation.
 
-- [ ] T014 [US1] Implement the SurrealDB source repository and uniqueness bootstrap in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/infra/surreal_source_repo.rs
+- [x] T014 [US1] Implement the SurrealDB source repository and uniqueness bootstrap in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/infra/surreal_source_repo.rs
 Outcome: The system can create-or-return an authoritative source record keyed by `external_id` and canonical payload hash.
 Dependencies: T007, T011, T013.
 Relevant inputs: plan.md Source model, Repository section, Idempotency decision; data-model.md Source validation rules.
@@ -201,7 +201,7 @@ Constraints: Enforce uniqueness in SurrealDB, not in handler memory; preserve im
 Done-when: A repository adapter can persist or replay `Source` rows transactionally and distinguish same-payload replay from conflicting payloads.
 Traceability: US1; FR-002; FR-004; AC-F2.
 
-- [ ] T015 [US1] Implement the SurrealDB memory-item repository and indexing outbox persistence in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/infra/surreal_memory_repo.rs
+- [x] T015 [US1] Implement the SurrealDB memory-item repository and indexing outbox persistence in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/infra/surreal_memory_repo.rs
 Outcome: Derived memory items and durable indexing jobs are written in the same authoritative transaction as the source.
 Dependencies: T007, T012, T013, T014.
 Relevant inputs: data-model.md Memory Item and MemoryIndexJob; plan.md Transactions and Repository responsibilities.
@@ -209,7 +209,7 @@ Constraints: `(source_id, sequence)` and `urn` uniqueness must be enforced; no p
 Done-when: A transactional write can commit source, ordered memory items, and an outbox job atomically or roll back all of them.
 Traceability: US1; FR-003; FR-004; NC-006.
 
-- [ ] T016 [US1] Implement RegisterSourceService in crates/mod_memory/src/application/register_source.rs
+- [x] T016 [US1] Implement RegisterSourceService in crates/mod_memory/src/application/register_source.rs
 Outcome: A use-case service validates canonical commands, normalizes content, enforces timeout/idempotency, persists authoritative state, and returns registration results with indexing status.
 Dependencies: T011, T012, T013, T014, T015.
 Relevant inputs: plan.md RegisterSourceService; spec.md User Story 1 and edge cases; research.md Decision 4, Decision 6, Decision 7.
@@ -255,7 +255,7 @@ Traceability: US2; AC-F3; AC-F6.
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] Implement the memory-item query repository and GetMemoryItemService in crates/mod_memory/src/infra/surreal_memory_query.rs and crates/mod_memory/src/application/get_memory_item.rs
+- [x] T020 [US2] Implement the memory-item query repository and GetMemoryItemService in crates/mod_memory/src/infra/surreal_memory_query.rs and crates/mod_memory/src/application/get_memory_item.rs
 Outcome: The application can load a single authoritative memory item plus optional source context from SurrealDB.
 Dependencies: T013, T015.
 Relevant inputs: plan.md GetMemoryItemService and Retrieval View; data-model.md Memory Item; spec.md FR-005.
@@ -301,7 +301,7 @@ Traceability: US3; AC-F4; NC-004.
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] Implement the source query repository and GetSourceService in crates/mod_memory/src/infra/surreal_source_query.rs and crates/mod_memory/src/application/get_source.rs
+- [x] T024 [US3] Implement the source query repository and GetSourceService in crates/mod_memory/src/infra/surreal_source_query.rs and crates/mod_memory/src/application/get_source.rs
 Outcome: The application can load a source aggregate view with all related memory items ordered from authoritative storage.
 Dependencies: T013, T015.
 Relevant inputs: plan.md GetSourceService and Retrieval View; data-model.md Source Retrieval View; spec.md FR-006.
@@ -387,7 +387,7 @@ Traceability: US4; G5; FR-009; AC-R2.
 
 **Purpose**: Validate the full vertical slice, lock the contract, and update operational docs.
 
-- [ ] T038 Implement Prometheus-compatible latency metrics and histogram buckets in crates/app_server/src/middleware.rs, crates/app_server/src/state.rs, and crates/app_server/src/main.rs
+- [X] T038 Implement Prometheus-compatible latency metrics and histogram buckets in crates/app_server/src/middleware.rs, crates/app_server/src/state.rs, and crates/app_server/src/main.rs
 Outcome: Endpoint latency is emitted with the histogram buckets required by the spec, and tracing/metrics share the same request correlation model.
 Dependencies: T005, T006.
 Relevant inputs: spec.md FR-013, NC-009; plan.md Observability requirements.
@@ -419,7 +419,7 @@ Constraints: Cover accepted payloads, pinned-schema failures, and shape-valid-bu
 Done-when: Verification coverage fails until the implementation proves standard-payload validation behavior matches the documented allow and reject matrix exactly.
 Traceability: FR-001; FR-002; FR-014; AC-F7; AC-V1; NC-012.
 
-- [ ] T046 [P] Add replay hashing determinism and idempotency verification in tests/unit/normalized_json_hash.rs, tests/integration/register_source_replay_hashing.rs, and tests/fixtures/register_source/replay_hashing/*.json
+- [x] T046 [P] Add replay hashing determinism and idempotency verification in tests/unit/normalized_json_hash.rs, tests/integration/register_source_replay_hashing.rs, and tests/fixtures/register_source/replay_hashing/*.json
 Outcome: Replay behavior for supported standard payloads is verified directly against the normalized-hash rule and preserved-content retrieval guarantee.
 Dependencies: T016, T017, T021.
 Relevant inputs: spec.md FR-002, FR-005, AC-F2, AC-F3, AC-V2; plan.md Remaining Implementation Risks; data-model.md Canonicalization Rules.

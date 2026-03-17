@@ -1,19 +1,16 @@
 [package]
-name = "app_server"
+name = "mod_memory"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = { workspace = true }
+async-trait = "0.1.89"
 core_infra = { path = "../core_infra" }
 core_shared = { path = "../core_shared" }
-http = { workspace = true }
-mod_memory = { path = "../mod_memory" }
+hex = "0.4.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
+time = { version = "0.3.44", features = ["serde"] }
 tokio = { workspace = true }
-tower = { workspace = true }
-tower-http = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
