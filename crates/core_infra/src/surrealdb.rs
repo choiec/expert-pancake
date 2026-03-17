@@ -1,0 +1,418 @@
+use std::time::Duration;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
+
+use core_shared::StartupError;
+use core_shared::{AppError, AppResult};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use surrealdb::{
+    Surreal,
+    engine::remote::ws::{Client, Ws},
+    opt::auth::Root,
+};
+use time::OffsetDateTime;
+use tokio::time::timeout;
+use uuid::Uuid;
+
+use crate::setup::SurrealDbSettings;
+
+#[derive(Debug)]
+pub struct SurrealDbService {
+    client: Surreal<Client>,
+    settings: SurrealDbSettings,
+}
+
+#[derive(Debug, Clone)]
+pub struct DependencyReport {
+    pub is_ready: bool,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedSourceRecord {
+    pub source_id: Uuid,
+    pub external_id: String,
+    pub title: String,
+    pub summary: Option<String>,
+    pub document_type: String,
+    pub source_metadata: serde_json::Value,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedMemoryItemRecord {
+    pub urn: String,
+    pub source_id: Uuid,
+    pub sequence: u32,
+    pub unit_type: String,
+    pub start_offset: u32,
+    pub end_offset: u32,
+    pub version: String,
+    pub content: String,
+    pub content_hash: String,
+    pub item_metadata: serde_json::Value,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedIndexJobRecord {
+    pub job_id: Uuid,
+    pub source_id: Uuid,
+    pub status: String,
+    pub retry_count: u32,
+    pub last_error: Option<String>,
+    pub available_at: OffsetDateTime,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistedSourceBundle {
+    pub source: PersistedSourceRecord,
+    pub memory_items: Vec<PersistedMemoryItemRecord>,
+    pub latest_job: Option<PersistedIndexJobRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectionRehydrationBundle {
+    pub source: PersistedSourceRecord,
+    pub memory_items: Vec<PersistedMemoryItemRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommitRegistrationOutcome {
+    Created(PersistedSourceBundle),
+    Replay(PersistedSourceBundle),
+}
+
+#[derive(Debug, Clone)]
+struct SurrealState {
+    sources_by_id: HashMap<Uuid, PersistedSourceRecord>,
+    source_ids_by_external_id: HashMap<String, Uuid>,
+    memory_by_urn: HashMap<String, PersistedMemoryItemRecord>,
+    memory_urns_by_source_id: HashMap<Uuid, Vec<String>>,
+    jobs_by_source_id: HashMap<Uuid, Vec<PersistedIndexJobRecord>>,
+    write_available: bool,
+    search_available: bool,
+    fail_next_commit: bool,
+}
+
+impl Default for SurrealState {
+    fn default() -> Self {
+        Self {
+            sources_by_id: HashMap::new(),
+            source_ids_by_external_id: HashMap::new(),
+            memory_by_urn: HashMap::new(),
+            memory_urns_by_source_id: HashMap::new(),
+            jobs_by_source_id: HashMap::new(),
+            write_available: true,
+            search_available: true,
+            fail_next_commit: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct InMemorySurrealDb {
+    state: Arc<Mutex<SurrealState>>,
+}
+
+impl InMemorySurrealDb {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_write_available(&self, available: bool) {
+        let mut state = self.state.lock().expect("surreal state poisoned");
+        state.write_available = available;
+    }
+
+    pub fn set_search_available(&self, available: bool) {
+        let mut state = self.state.lock().expect("surreal state poisoned");
+        state.search_available = available;
+    }
+
+    pub fn search_available(&self) -> bool {
+        self.state
+            .lock()
+            .expect("surreal state poisoned")
+            .search_available
+    }
+
+    pub fn readiness_probe(&self) -> AppResult<()> {
+        let state = self.state.lock().expect("surreal state poisoned");
+        if state.write_available {
+            Ok(())
+        } else {
+            Err(AppError::storage_unavailable(
+                "SurrealDB write path is unavailable",
+            ))
+        }
+    }
+
+    pub fn fail_next_commit(&self) {
+        let mut state = self.state.lock().expect("surreal state poisoned");
+        state.fail_next_commit = true;
+    }
+
+    pub fn lookup_source_by_external_id(&self, external_id: &str) -> Option<PersistedSourceBundle> {
+        let state = self.state.lock().expect("surreal state poisoned");
+        let source_id = state.source_ids_by_external_id.get(external_id)?;
+        Self::bundle_from_state(&state, *source_id)
+    }
+
+    pub fn get_source_bundle(&self, source_id: Uuid) -> Option<PersistedSourceBundle> {
+        let state = self.state.lock().expect("surreal state poisoned");
+        Self::bundle_from_state(&state, source_id)
+    }
+
+    pub fn get_memory_item(
+        &self,
+        urn: &str,
+    ) -> Option<(PersistedMemoryItemRecord, PersistedSourceRecord)> {
+        let state = self.state.lock().expect("surreal state poisoned");
+        let item = state.memory_by_urn.get(urn)?.clone();
+        let source = state.sources_by_id.get(&item.source_id)?.clone();
+        Some((item, source))
+    }
+
+    pub fn rehydrate_projection(&self, source_id: Uuid) -> Option<ProjectionRehydrationBundle> {
+        let state = self.state.lock().expect("surreal state poisoned");
+        let bundle = Self::bundle_from_state(&state, source_id)?;
+        Some(ProjectionRehydrationBundle {
+            source: bundle.source,
+            memory_items: bundle.memory_items,
+        })
+    }
+
+    pub fn commit_registration(
+        &self,
+        source: PersistedSourceRecord,
+        memory_items: Vec<PersistedMemoryItemRecord>,
+        job: PersistedIndexJobRecord,
+    ) -> AppResult<CommitRegistrationOutcome> {
+        let mut state = self.state.lock().expect("surreal state poisoned");
+        if !state.write_available {
+            return Err(AppError::storage_unavailable(
+                "SurrealDB write path is unavailable",
+            ));
+        }
+        if state.fail_next_commit {
+            state.fail_next_commit = false;
+            return Err(AppError::storage_unavailable(
+                "simulated transactional failure",
+            ));
+        }
+
+        if let Some(existing_id) = state
+            .source_ids_by_external_id
+            .get(&source.external_id)
+            .copied()
+        {
+            let existing = Self::bundle_from_state(&state, existing_id)
+                .ok_or_else(|| AppError::internal("missing bundle for replayed source"))?;
+            let existing_hash = existing
+                .source
+                .source_metadata
+                .pointer("/system/canonical_payload_hash")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let requested_hash = source
+                .source_metadata
+                .pointer("/system/canonical_payload_hash")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            if existing_hash == requested_hash {
+                return Ok(CommitRegistrationOutcome::Replay(existing));
+            }
+            return Err(AppError::conflict(format!(
+                "external_id '{}' is already bound to a different canonical payload",
+                source.external_id
+            )));
+        }
+
+        let mut next_state = state.clone();
+        Self::validate_memory_constraints(&next_state, &source, &memory_items)?;
+
+        next_state
+            .source_ids_by_external_id
+            .insert(source.external_id.clone(), source.source_id);
+        next_state
+            .sources_by_id
+            .insert(source.source_id, source.clone());
+        next_state.memory_urns_by_source_id.insert(
+            source.source_id,
+            memory_items.iter().map(|item| item.urn.clone()).collect(),
+        );
+        for item in &memory_items {
+            next_state
+                .memory_by_urn
+                .insert(item.urn.clone(), item.clone());
+        }
+        next_state
+            .jobs_by_source_id
+            .entry(source.source_id)
+            .or_default()
+            .push(job);
+
+        let bundle = Self::bundle_from_state(&next_state, source.source_id)
+            .ok_or_else(|| AppError::internal("failed to assemble committed bundle"))?;
+        *state = next_state;
+        Ok(CommitRegistrationOutcome::Created(bundle))
+    }
+
+    fn validate_memory_constraints(
+        state: &SurrealState,
+        source: &PersistedSourceRecord,
+        memory_items: &[PersistedMemoryItemRecord],
+    ) -> AppResult<()> {
+        let mut seen_sequences = HashMap::new();
+        let mut seen_urns = HashMap::new();
+        for item in memory_items {
+            if item.source_id != source.source_id {
+                return Err(AppError::validation("memory item source_id mismatch"));
+            }
+            if item.start_offset > item.end_offset {
+                return Err(AppError::validation("memory item offsets are invalid"));
+            }
+            if state.memory_by_urn.contains_key(&item.urn)
+                || seen_urns.insert(item.urn.clone(), item.sequence).is_some()
+            {
+                return Err(AppError::conflict(format!(
+                    "memory item URN '{}' must be unique",
+                    item.urn
+                )));
+            }
+            if seen_sequences
+                .insert(item.sequence, item.urn.clone())
+                .is_some()
+            {
+                return Err(AppError::conflict(format!(
+                    "duplicate sequence {} for source {}",
+                    item.sequence, source.source_id
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn bundle_from_state(state: &SurrealState, source_id: Uuid) -> Option<PersistedSourceBundle> {
+        let source = state.sources_by_id.get(&source_id)?.clone();
+        let mut memory_items = state
+            .memory_urns_by_source_id
+            .get(&source_id)
+            .into_iter()
+            .flatten()
+            .filter_map(|urn| state.memory_by_urn.get(urn).cloned())
+            .collect::<Vec<_>>();
+        memory_items.sort_by_key(|item| item.sequence);
+        let latest_job = state
+            .jobs_by_source_id
+            .get(&source_id)
+            .and_then(|jobs| jobs.last().cloned());
+        Some(PersistedSourceBundle {
+            source,
+            memory_items,
+            latest_job,
+        })
+    }
+}
+
+pub async fn bootstrap(settings: SurrealDbSettings) -> Result<SurrealDbService, StartupError> {
+    let settings_for_connect = settings.clone();
+    let client = timeout(settings.connect_timeout, async move {
+        let client = Surreal::new::<Ws>(settings_for_connect.url.as_str())
+            .await
+            .map_err(|error| StartupError::InfraBootstrap {
+                component: "surrealdb".to_string(),
+                reason: error.to_string(),
+            })?;
+
+        client
+            .signin(Root {
+                username: &settings_for_connect.username,
+                password: &settings_for_connect.password,
+            })
+            .await
+            .map_err(|error| StartupError::InfraBootstrap {
+                component: "surrealdb".to_string(),
+                reason: error.to_string(),
+            })?;
+
+        client
+            .use_ns(&settings_for_connect.namespace)
+            .use_db(&settings_for_connect.database)
+            .await
+            .map_err(|error| StartupError::InfraBootstrap {
+                component: "surrealdb".to_string(),
+                reason: error.to_string(),
+            })?;
+
+        Ok::<_, StartupError>(client)
+    })
+    .await
+    .map_err(|_| StartupError::InfraBootstrap {
+        component: "surrealdb".to_string(),
+        reason: format!(
+            "bootstrap timed out after {} ms",
+            settings.connect_timeout.as_millis()
+        ),
+    })??;
+
+    Ok(SurrealDbService { client, settings })
+}
+
+impl SurrealDbService {
+    pub fn client(&self) -> &Surreal<Client> {
+        &self.client
+    }
+
+    pub fn readiness_timeout(&self) -> Duration {
+        self.settings.readiness_timeout
+    }
+
+    pub async fn readiness(&self) -> DependencyReport {
+        let readiness = timeout(self.settings.readiness_timeout, async {
+            let record_id = format!("probe-{}", Uuid::new_v4());
+
+            let _: Option<serde_json::Value> = self
+                .client
+                .create(("readiness_probe", record_id.as_str()))
+                .content(json!({ "checked": true }))
+                .await
+                .map_err(|error| error.to_string())?;
+
+            let _: Option<serde_json::Value> = self
+                .client
+                .delete(("readiness_probe", record_id.as_str()))
+                .await
+                .map_err(|error| error.to_string())?;
+
+            Ok::<(), String>(())
+        })
+        .await;
+
+        match readiness {
+            Ok(Ok(())) => DependencyReport {
+                is_ready: true,
+                detail: None,
+            },
+            Ok(Err(error)) => DependencyReport {
+                is_ready: false,
+                detail: Some(error),
+            },
+            Err(_) => DependencyReport {
+                is_ready: false,
+                detail: Some(format!(
+                    "readiness probe timed out after {} ms",
+                    self.settings.readiness_timeout.as_millis()
+                )),
+            },
+        }
+    }
+}
