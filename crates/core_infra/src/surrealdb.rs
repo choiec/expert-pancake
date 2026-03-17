@@ -19,6 +19,10 @@ use uuid::Uuid;
 
 use crate::setup::SurrealDbSettings;
 
+const SOURCE_TABLE: &str = "memory_source";
+const MEMORY_ITEM_TABLE: &str = "memory_item";
+const INDEX_JOB_TABLE: &str = "memory_index_job";
+
 #[derive(Debug)]
 pub struct SurrealDbService {
     client: Surreal<Client>,
@@ -118,6 +122,11 @@ impl Default for SurrealState {
 }
 
 #[derive(Debug, Clone, Default)]
+/// Deterministic in-memory authoritative store used by tests and contracts.
+///
+/// Production/runtime code should use `SurrealDbService` and the runtime
+/// repositories in `mod_memory::infra` so transactional semantics are enforced
+/// by the real SurrealDB backend.
 pub struct InMemorySurrealDb {
     state: Arc<Mutex<SurrealState>>,
 }
@@ -364,7 +373,16 @@ pub async fn bootstrap(settings: SurrealDbSettings) -> Result<SurrealDbService, 
         ),
     })??;
 
-    Ok(SurrealDbService { client, settings })
+    let service = SurrealDbService { client, settings };
+    service
+        .ensure_memory_ingest_schema()
+        .await
+        .map_err(|error| StartupError::InfraBootstrap {
+            component: "surrealdb".to_owned(),
+            reason: error.message().to_owned(),
+        })?;
+
+    Ok(service)
 }
 
 impl SurrealDbService {
@@ -415,4 +433,151 @@ impl SurrealDbService {
             },
         }
     }
+
+    pub async fn ensure_memory_ingest_schema(&self) -> AppResult<()> {
+        let response = self
+            .client
+            .query(format!(
+                "DEFINE TABLE IF NOT EXISTS {SOURCE_TABLE} SCHEMALESS;\n\
+DEFINE TABLE IF NOT EXISTS {MEMORY_ITEM_TABLE} SCHEMALESS;\n\
+DEFINE TABLE IF NOT EXISTS {INDEX_JOB_TABLE} SCHEMALESS;\n\
+DEFINE INDEX IF NOT EXISTS memory_source_source_id ON TABLE {SOURCE_TABLE} COLUMNS source_id UNIQUE;\n\
+DEFINE INDEX IF NOT EXISTS memory_source_external_id ON TABLE {SOURCE_TABLE} COLUMNS external_id UNIQUE;\n\
+DEFINE INDEX IF NOT EXISTS memory_item_urn ON TABLE {MEMORY_ITEM_TABLE} COLUMNS urn UNIQUE;\n\
+DEFINE INDEX IF NOT EXISTS memory_item_source_sequence ON TABLE {MEMORY_ITEM_TABLE} COLUMNS source_id, sequence UNIQUE;\n\
+DEFINE INDEX IF NOT EXISTS memory_index_job_job_id ON TABLE {INDEX_JOB_TABLE} COLUMNS job_id UNIQUE;\n\
+DEFINE INDEX IF NOT EXISTS memory_index_job_source_id_created_at ON TABLE {INDEX_JOB_TABLE} COLUMNS source_id, created_at;"
+            ))
+            .await
+            .map_err(map_surreal_read_error)?;
+        response.check().map_err(map_surreal_write_error)?;
+        Ok(())
+    }
+
+    pub async fn find_source_by_external_id(
+        &self,
+        external_id: &str,
+    ) -> AppResult<Option<PersistedSourceRecord>> {
+        let mut response = self
+            .client
+            .query(format!(
+                "SELECT * FROM {SOURCE_TABLE} WHERE external_id = $external_id LIMIT 1;"
+            ))
+            .bind(("external_id", external_id.to_owned()))
+            .await
+            .map_err(map_surreal_read_error)?;
+        let rows: Vec<PersistedSourceRecord> = response.take(0).map_err(map_surreal_read_error)?;
+        Ok(rows.into_iter().next())
+    }
+
+    pub async fn find_source_by_source_id(
+        &self,
+        source_id: Uuid,
+    ) -> AppResult<Option<PersistedSourceRecord>> {
+        let mut response = self
+            .client
+            .query(format!(
+                "SELECT * FROM {SOURCE_TABLE} WHERE source_id = $source_id LIMIT 1;"
+            ))
+            .bind(("source_id", source_id))
+            .await
+            .map_err(map_surreal_read_error)?;
+        let rows: Vec<PersistedSourceRecord> = response.take(0).map_err(map_surreal_read_error)?;
+        Ok(rows.into_iter().next())
+    }
+
+    pub async fn find_memory_items_by_source_id(
+        &self,
+        source_id: Uuid,
+    ) -> AppResult<Vec<PersistedMemoryItemRecord>> {
+        let mut response = self
+            .client
+            .query(format!(
+                "SELECT * FROM {MEMORY_ITEM_TABLE} WHERE source_id = $source_id ORDER BY sequence ASC;"
+            ))
+            .bind(("source_id", source_id))
+            .await
+            .map_err(map_surreal_read_error)?;
+        response.take(0).map_err(map_surreal_read_error)
+    }
+
+    pub async fn find_latest_index_job_by_source_id(
+        &self,
+        source_id: Uuid,
+    ) -> AppResult<Option<PersistedIndexJobRecord>> {
+        let mut response = self
+            .client
+            .query(format!(
+                "SELECT * FROM {INDEX_JOB_TABLE} WHERE source_id = $source_id ORDER BY created_at DESC LIMIT 1;"
+            ))
+            .bind(("source_id", source_id))
+            .await
+            .map_err(map_surreal_read_error)?;
+        let rows: Vec<PersistedIndexJobRecord> =
+            response.take(0).map_err(map_surreal_read_error)?;
+        Ok(rows.into_iter().next())
+    }
+
+    pub async fn find_memory_item_by_urn(
+        &self,
+        urn: &str,
+    ) -> AppResult<Option<PersistedMemoryItemRecord>> {
+        let mut response = self
+            .client
+            .query(format!(
+                "SELECT * FROM {MEMORY_ITEM_TABLE} WHERE urn = $urn LIMIT 1;"
+            ))
+            .bind(("urn", urn.to_owned()))
+            .await
+            .map_err(map_surreal_read_error)?;
+        let rows: Vec<PersistedMemoryItemRecord> =
+            response.take(0).map_err(map_surreal_read_error)?;
+        Ok(rows.into_iter().next())
+    }
+
+    pub async fn commit_authoritative_registration(
+        &self,
+        source: PersistedSourceRecord,
+        memory_items: Vec<PersistedMemoryItemRecord>,
+        job: PersistedIndexJobRecord,
+    ) -> AppResult<()> {
+        let mut query = format!("BEGIN TRANSACTION;\nCREATE {SOURCE_TABLE} CONTENT $source;\n");
+        for index in 0..memory_items.len() {
+            query.push_str(&format!(
+                "CREATE {MEMORY_ITEM_TABLE} CONTENT $memory_item_{index};\n"
+            ));
+        }
+        query.push_str(&format!(
+            "CREATE {INDEX_JOB_TABLE} CONTENT $job;\nCOMMIT TRANSACTION;"
+        ));
+
+        let mut request = self.client.query(query).bind(("source", source));
+        for (index, item) in memory_items.into_iter().enumerate() {
+            let binding = format!("memory_item_{index}");
+            request = request.bind((binding, item));
+        }
+        let response = request
+            .bind(("job", job))
+            .await
+            .map_err(map_surreal_write_error)?;
+        response.check().map_err(map_surreal_write_error)?;
+        Ok(())
+    }
+}
+
+fn map_surreal_read_error(error: impl std::fmt::Display) -> AppError {
+    AppError::storage_unavailable(format!("SurrealDB read failed: {error}"))
+}
+
+fn map_surreal_write_error(error: impl std::fmt::Display) -> AppError {
+    let message = error.to_string();
+    let lowered = message.to_ascii_lowercase();
+    if lowered.contains("unique")
+        || lowered.contains("duplicate")
+        || lowered.contains("constraint")
+        || lowered.contains("index")
+    {
+        return AppError::conflict(message);
+    }
+    AppError::storage_unavailable(format!("SurrealDB write failed: {message}"))
 }

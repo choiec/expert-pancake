@@ -117,6 +117,8 @@ pub async fn latency_metrics(
 
     let response = next.run(request).await;
 
+    // Future handlers can enrich this with bounded labels by writing a
+    // `MetricsLabels` value into the response extensions before returning.
     let labels = response
         .extensions()
         .get::<MetricsLabels>()

@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use core_infra::surrealdb::{
     InMemorySurrealDb, PersistedIndexJobRecord, PersistedMemoryItemRecord, PersistedSourceBundle,
-    PersistedSourceRecord,
+    PersistedSourceRecord, SurrealDbService,
 };
 use core_shared::{AppError, AppResult, MemoryItemUrn};
 
@@ -14,7 +14,10 @@ use crate::domain::source::{DocumentType, NewSource, Source};
 use crate::infra::indexer::{OutboxStatus, derive_public_indexing_status};
 use crate::infra::repo::{SourceBundle, SourceCreateOrReplay, SourceRepository};
 
+type SearchAvailabilityProbe = Arc<dyn Fn() -> bool + Send + Sync>;
+
 #[derive(Debug, Clone)]
+/// Fixture-backed repository used by storage contract tests.
 pub struct SurrealSourceRepository {
     db: Arc<InMemorySurrealDb>,
 }
@@ -22,6 +25,26 @@ pub struct SurrealSourceRepository {
 impl SurrealSourceRepository {
     pub fn new(db: Arc<InMemorySurrealDb>) -> Self {
         Self { db }
+    }
+}
+
+#[derive(Clone)]
+/// Production/runtime repository backed by the real SurrealDB client.
+pub struct RuntimeSurrealSourceRepository {
+    db: Arc<SurrealDbService>,
+    search_available: SearchAvailabilityProbe,
+}
+
+impl RuntimeSurrealSourceRepository {
+    pub fn new(db: Arc<SurrealDbService>, search_available: SearchAvailabilityProbe) -> Self {
+        Self {
+            db,
+            search_available,
+        }
+    }
+
+    fn search_available(&self) -> bool {
+        (self.search_available)()
     }
 }
 
@@ -48,6 +71,75 @@ impl SourceRepository for SurrealSourceRepository {
         }
         Ok(SourceCreateOrReplay::Create(source))
     }
+}
+
+#[async_trait]
+impl SourceRepository for RuntimeSurrealSourceRepository {
+    async fn prepare_create_or_replay(&self, source: NewSource) -> AppResult<SourceCreateOrReplay> {
+        if let Some(existing) =
+            fetch_source_bundle_by_external_id(self.db.as_ref(), &source.external_id).await?
+        {
+            let existing_hash = existing
+                .source
+                .source_metadata
+                .pointer("/system/canonical_payload_hash")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            if existing_hash == source.canonical_payload_hash() {
+                return Ok(SourceCreateOrReplay::Replay(bundle_from_records(
+                    existing,
+                    self.search_available(),
+                )?));
+            }
+            return Err(AppError::conflict(format!(
+                "external_id '{}' is already registered with a different canonical payload",
+                source.external_id
+            )));
+        }
+        Ok(SourceCreateOrReplay::Create(source))
+    }
+}
+
+pub(crate) async fn fetch_source_bundle_by_external_id(
+    db: &SurrealDbService,
+    external_id: &str,
+) -> AppResult<Option<PersistedSourceBundle>> {
+    let Some(source) = db.find_source_by_external_id(external_id).await? else {
+        return Ok(None);
+    };
+    fetch_source_bundle_by_source_id(db, source.source_id).await
+}
+
+pub(crate) async fn fetch_source_bundle_by_source_id(
+    db: &SurrealDbService,
+    source_id: uuid::Uuid,
+) -> AppResult<Option<PersistedSourceBundle>> {
+    let Some(source) = db.find_source_by_source_id(source_id).await? else {
+        return Ok(None);
+    };
+    let memory_items = db.find_memory_items_by_source_id(source_id).await?;
+    let latest_job = db.find_latest_index_job_by_source_id(source_id).await?;
+    Ok(Some(PersistedSourceBundle {
+        source,
+        memory_items,
+        latest_job,
+    }))
+}
+
+pub(crate) async fn fetch_memory_item_with_source(
+    db: &SurrealDbService,
+    urn: &str,
+) -> AppResult<Option<(PersistedMemoryItemRecord, PersistedSourceRecord)>> {
+    let Some(memory_item) = db.find_memory_item_by_urn(urn).await? else {
+        return Ok(None);
+    };
+    let Some(source) = db.find_source_by_source_id(memory_item.source_id).await? else {
+        return Err(AppError::internal(format!(
+            "source '{}' is missing for memory item '{}'",
+            memory_item.source_id, urn
+        )));
+    };
+    Ok(Some((memory_item, source)))
 }
 
 pub(crate) fn bundle_from_records(

@@ -1,3 +1,8 @@
+//! Fixture-level authoritative storage contract proofs.
+//!
+//! These tests exercise `InMemorySurrealDb`, which deliberately models the
+//! same transactional rollback and uniqueness semantics as the runtime adapter.
+
 use std::sync::Arc;
 use std::time::Duration;
 

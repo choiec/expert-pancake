@@ -37,3 +37,15 @@ fn semantic_json_changes_produce_a_different_hash() {
 
     assert_ne!(left_hash, right_hash);
 }
+
+#[test]
+fn clr_formatting_only_variants_share_the_same_hash() {
+    let compact = include_str!("../fixtures/register_source/replay_hashing/clr_compact.json");
+    let formatted = include_str!("../fixtures/register_source/replay_hashing/clr_pretty.json");
+
+    let compact_hash = normalized_json_hash_from_str(compact).expect("compact CLR should hash");
+    let formatted_hash =
+        normalized_json_hash_from_str(formatted).expect("formatted CLR should hash");
+
+    assert_eq!(compact_hash, formatted_hash);
+}

@@ -33,35 +33,49 @@ pub struct TimeoutConfig {
 
 impl AppConfig {
     pub fn from_env() -> Result<Self, StartupError> {
+        Self::from_lookup(lookup_env)
+    }
+
+    fn from_lookup<F>(lookup: F) -> Result<Self, StartupError>
+    where
+        F: Fn(&str) -> Result<Option<String>, StartupError>,
+    {
         let http = HttpConfig {
-            listen_addr: parse_socket_addr(&required_env("APP_LISTEN_ADDR")?, "APP_LISTEN_ADDR")?,
+            listen_addr: parse_socket_addr(
+                &required_value(&lookup, "APP_LISTEN_ADDR")?,
+                "APP_LISTEN_ADDR",
+            )?,
         };
 
         let surrealdb = SurrealDbSettings {
-            url: required_env("SURREALDB_URL")?,
-            namespace: required_env("SURREALDB_NAMESPACE")?,
-            database: required_env("SURREALDB_DATABASE")?,
-            username: required_env("SURREALDB_USERNAME")?,
-            password: required_env("SURREALDB_PASSWORD")?,
+            url: required_value(&lookup, "SURREALDB_URL")?,
+            namespace: required_value(&lookup, "SURREALDB_NAMESPACE")?,
+            database: required_value(&lookup, "SURREALDB_DATABASE")?,
+            username: required_value(&lookup, "SURREALDB_USERNAME")?,
+            password: required_value(&lookup, "SURREALDB_PASSWORD")?,
             connect_timeout: parse_duration_ms(
+                &lookup,
                 "SURREALDB_CONNECT_TIMEOUT_MS",
                 DEFAULT_CONNECT_TIMEOUT_MS,
             )?,
             readiness_timeout: parse_duration_ms(
+                &lookup,
                 "SURREALDB_READY_TIMEOUT_MS",
                 DEFAULT_READY_TIMEOUT_MS,
             )?,
         };
 
         let meilisearch = MeilisearchSettings {
-            http_addr: required_env("MEILI_HTTP_ADDR")?,
-            master_key: required_env("MEILI_MASTER_KEY")?,
-            enabled: parse_bool("MEMORY_INGEST_ENABLED", true)?,
+            http_addr: required_value(&lookup, "MEILI_HTTP_ADDR")?,
+            master_key: required_value(&lookup, "MEILI_MASTER_KEY")?,
+            enabled: parse_bool(&lookup, "MEMORY_INGEST_ENABLED", true)?,
             connect_timeout: parse_duration_ms(
+                &lookup,
                 "MEILI_CONNECT_TIMEOUT_MS",
                 DEFAULT_CONNECT_TIMEOUT_MS,
             )?,
             readiness_timeout: parse_duration_ms(
+                &lookup,
                 "MEILI_READY_TIMEOUT_MS",
                 DEFAULT_READY_TIMEOUT_MS,
             )?,
@@ -69,6 +83,7 @@ impl AppConfig {
 
         let limits = LimitsConfig {
             max_request_body_bytes: parse_usize(
+                &lookup,
                 "MEMORY_MAX_REQUEST_BODY_BYTES",
                 DEFAULT_MAX_REQUEST_BODY_BYTES,
             )?,
@@ -76,6 +91,7 @@ impl AppConfig {
 
         let timeouts = TimeoutConfig {
             normalization_timeout: parse_duration_secs(
+                &lookup,
                 "MEMORY_NORMALIZATION_TIMEOUT_SECS",
                 DEFAULT_NORMALIZATION_TIMEOUT_SECS,
             )?,
@@ -125,8 +141,23 @@ impl AppConfig {
     }
 }
 
-fn required_env(key: &str) -> Result<String, StartupError> {
-    env::var(key).map_err(|_| StartupError::MissingEnv {
+fn lookup_env(key: &str) -> Result<Option<String>, StartupError> {
+    match env::var(key) {
+        Ok(value) => Ok(Some(value)),
+        Err(env::VarError::NotPresent) => Ok(None),
+        Err(env::VarError::NotUnicode(_)) => Err(StartupError::InvalidEnv {
+            key: key.to_string(),
+            value: "<non-utf8>".to_string(),
+            reason: "value is not valid UTF-8".to_string(),
+        }),
+    }
+}
+
+fn required_value<F>(lookup: &F, key: &str) -> Result<String, StartupError>
+where
+    F: Fn(&str) -> Result<Option<String>, StartupError>,
+{
+    lookup(key)?.ok_or_else(|| StartupError::MissingEnv {
         key: key.to_string(),
     })
 }
@@ -141,53 +172,58 @@ fn parse_socket_addr(value: &str, key: &str) -> Result<SocketAddr, StartupError>
         })
 }
 
-fn parse_duration_ms(key: &str, default: u64) -> Result<Duration, StartupError> {
-    parse_u64(key, default).map(Duration::from_millis)
+fn parse_duration_ms<F>(lookup: &F, key: &str, default: u64) -> Result<Duration, StartupError>
+where
+    F: Fn(&str) -> Result<Option<String>, StartupError>,
+{
+    parse_u64(lookup, key, default).map(Duration::from_millis)
 }
 
-fn parse_duration_secs(key: &str, default: u64) -> Result<Duration, StartupError> {
-    parse_u64(key, default).map(Duration::from_secs)
+fn parse_duration_secs<F>(lookup: &F, key: &str, default: u64) -> Result<Duration, StartupError>
+where
+    F: Fn(&str) -> Result<Option<String>, StartupError>,
+{
+    parse_u64(lookup, key, default).map(Duration::from_secs)
 }
 
-fn parse_u64(key: &str, default: u64) -> Result<u64, StartupError> {
-    match env::var(key) {
-        Ok(value) => value
+fn parse_u64<F>(lookup: &F, key: &str, default: u64) -> Result<u64, StartupError>
+where
+    F: Fn(&str) -> Result<Option<String>, StartupError>,
+{
+    match lookup(key)? {
+        Some(value) => value
             .parse::<u64>()
             .map_err(|error| StartupError::InvalidEnv {
                 key: key.to_string(),
                 value,
                 reason: error.to_string(),
             }),
-        Err(env::VarError::NotPresent) => Ok(default),
-        Err(env::VarError::NotUnicode(_)) => Err(StartupError::InvalidEnv {
-            key: key.to_string(),
-            value: "<non-utf8>".to_string(),
-            reason: "value is not valid UTF-8".to_string(),
-        }),
+        None => Ok(default),
     }
 }
 
-fn parse_usize(key: &str, default: usize) -> Result<usize, StartupError> {
-    match env::var(key) {
-        Ok(value) => value
+fn parse_usize<F>(lookup: &F, key: &str, default: usize) -> Result<usize, StartupError>
+where
+    F: Fn(&str) -> Result<Option<String>, StartupError>,
+{
+    match lookup(key)? {
+        Some(value) => value
             .parse::<usize>()
             .map_err(|error| StartupError::InvalidEnv {
                 key: key.to_string(),
                 value,
                 reason: error.to_string(),
             }),
-        Err(env::VarError::NotPresent) => Ok(default),
-        Err(env::VarError::NotUnicode(_)) => Err(StartupError::InvalidEnv {
-            key: key.to_string(),
-            value: "<non-utf8>".to_string(),
-            reason: "value is not valid UTF-8".to_string(),
-        }),
+        None => Ok(default),
     }
 }
 
-fn parse_bool(key: &str, default: bool) -> Result<bool, StartupError> {
-    match env::var(key) {
-        Ok(value) => match value.trim().to_ascii_lowercase().as_str() {
+fn parse_bool<F>(lookup: &F, key: &str, default: bool) -> Result<bool, StartupError>
+where
+    F: Fn(&str) -> Result<Option<String>, StartupError>,
+{
+    match lookup(key)? {
+        Some(value) => match value.trim().to_ascii_lowercase().as_str() {
             "1" | "true" | "yes" => Ok(true),
             "0" | "false" | "no" => Ok(false),
             _ => Err(StartupError::InvalidEnv {
@@ -196,11 +232,41 @@ fn parse_bool(key: &str, default: bool) -> Result<bool, StartupError> {
                 reason: "expected one of true/false/1/0/yes/no".to_string(),
             }),
         },
-        Err(env::VarError::NotPresent) => Ok(default),
-        Err(env::VarError::NotUnicode(_)) => Err(StartupError::InvalidEnv {
-            key: key.to_string(),
-            value: "<non-utf8>".to_string(),
-            reason: "value is not valid UTF-8".to_string(),
-        }),
+        None => Ok(default),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::AppConfig;
+    use core_shared::StartupError;
+
+    #[test]
+    fn missing_required_env_returns_structured_startup_error() {
+        let values = BTreeMap::<String, String>::new();
+        let error = AppConfig::from_lookup(|key| Ok(values.get(key).cloned())).unwrap_err();
+
+        assert_eq!(
+            error,
+            StartupError::MissingEnv {
+                key: "APP_LISTEN_ADDR".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn invalid_listen_addr_returns_structured_startup_error() {
+        let values = BTreeMap::from([(
+            "APP_LISTEN_ADDR".to_string(),
+            "not-a-socket-address".to_string(),
+        )]);
+        let error = AppConfig::from_lookup(|key| Ok(values.get(key).cloned())).unwrap_err();
+
+        assert!(matches!(
+            error,
+            StartupError::InvalidEnv { key, .. } if key == "APP_LISTEN_ADDR"
+        ));
     }
 }

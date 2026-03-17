@@ -1,3 +1,8 @@
+//! Fixture-level authoritative retention contract proofs.
+//!
+//! These tests pin no-TTL semantics against the deterministic in-memory
+//! fixture, not against a live SurrealDB process.
+
 use std::sync::Arc;
 use std::time::Duration;
 

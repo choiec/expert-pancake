@@ -50,6 +50,10 @@ name = "normalized_json_hash"
 path = "tests/unit/normalized_json_hash.rs"
 
 [[test]]
+name = "normalization_edges"
+path = "tests/unit/normalization_edges.rs"
+
+[[test]]
 name = "register_source_replay_hashing"
 path = "tests/integration/register_source_replay_hashing.rs"
 

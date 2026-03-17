@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use core_infra::{NoopGraphProjectionAdapter, surrealdb::InMemorySurrealDb};
-use core_shared::{DefaultIdGenerator, MemoryItemUrn};
+use core_shared::{DefaultIdGenerator, ErrorCode, MemoryItemUrn};
 use mod_memory::application::get_memory_item::GetMemoryItemService;
 use mod_memory::application::register_source::{
     RegisterSourceCommand, RegisterSourceService, SystemClock,
@@ -14,31 +14,48 @@ use mod_memory::infra::surreal_memory_query::SurrealMemoryQueryRepository;
 use mod_memory::infra::surreal_memory_repo::SurrealMemoryRepository;
 use mod_memory::infra::surreal_source_repo::SurrealSourceRepository;
 
-#[tokio::test]
-async fn formatting_only_replay_returns_the_first_authoritative_json_body() {
-    let db = Arc::new(InMemorySurrealDb::new());
-    let service = RegisterSourceService::new(
+fn fixture(path: &str) -> &'static str {
+    match path {
+        "open_badges_compact" => {
+            include_str!("../fixtures/register_source/replay_hashing/open_badges_compact.json")
+        }
+        "open_badges_pretty" => {
+            include_str!("../fixtures/register_source/replay_hashing/open_badges_pretty.json")
+        }
+        "clr_compact" => {
+            include_str!("../fixtures/register_source/replay_hashing/clr_compact.json")
+        }
+        "clr_pretty" => {
+            include_str!("../fixtures/register_source/replay_hashing/clr_pretty.json")
+        }
+        "clr_conflict" => {
+            include_str!("../fixtures/register_source/replay_hashing/clr_conflict.json")
+        }
+        _ => panic!("unknown fixture path: {path}"),
+    }
+}
+
+fn build_service(db: Arc<InMemorySurrealDb>) -> RegisterSourceService {
+    RegisterSourceService::new(
         Arc::new(SurrealSourceRepository::new(db.clone())),
-        Arc::new(SurrealMemoryRepository::new(db.clone())),
+        Arc::new(SurrealMemoryRepository::new(db)),
         Arc::new(OutboxOnlyIndexer::new(true)),
         Arc::new(NoopGraphProjectionAdapter),
         Arc::new(SystemClock),
         Arc::new(DefaultIdGenerator),
         Duration::from_secs(30),
-    );
+    )
+}
+
+#[tokio::test]
+async fn formatting_only_replay_returns_the_first_authoritative_json_body() {
+    let db = Arc::new(InMemorySurrealDb::new());
+    let service = build_service(db.clone());
     let query_service =
         GetMemoryItemService::new(Arc::new(SurrealMemoryQueryRepository::new(db.clone())));
 
-    let first_body = r#"{"id":"urn:badge:001","name":"Rust Badge","issuer":{"id":"https://issuer.example.org"}}"#;
-    let replay_body = r#"
-    {
-      "issuer": {
-        "id": "https://issuer.example.org"
-      },
-      "name": "Rust Badge",
-      "id": "urn:badge:001"
-    }
-    "#;
+    let first_body = fixture("open_badges_compact");
+    let replay_body = fixture("open_badges_pretty");
     let canonical_hash = normalized_json_hash_from_str(first_body).expect("first payload hashes");
 
     let created = service
@@ -83,4 +100,109 @@ async fn formatting_only_replay_returns_the_first_authoritative_json_body() {
     assert_eq!(memory_item.content, first_body);
     assert_eq!(memory_item.document_type, DocumentType::Json);
     assert_eq!(memory_item.unit_type, "json_document");
+}
+
+#[tokio::test]
+async fn clr_formatting_only_replay_preserves_the_first_authoritative_raw_body() {
+    let db = Arc::new(InMemorySurrealDb::new());
+    let service = build_service(db.clone());
+    let query_service =
+        GetMemoryItemService::new(Arc::new(SurrealMemoryQueryRepository::new(db.clone())));
+
+    let first_body = fixture("clr_compact");
+    let replay_body = fixture("clr_pretty");
+
+    let created = service
+        .execute(RegisterSourceCommand {
+            external_id: "https://clr.example/credentials/123".to_owned(),
+            title: "Rust CLR".to_owned(),
+            summary: Some("clr replay test".to_owned()),
+            document_type: DocumentType::Json,
+            authoritative_content: first_body.to_owned(),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
+            canonical_payload_hash: normalized_json_hash_from_str(first_body)
+                .expect("compact CLR should hash"),
+            ingest_kind: IngestKind::DirectStandard,
+        })
+        .await
+        .expect("first CLR registration should succeed");
+
+    let replay = service
+        .execute(RegisterSourceCommand {
+            external_id: "https://clr.example/credentials/123".to_owned(),
+            title: "Rust CLR".to_owned(),
+            summary: Some("clr replay test".to_owned()),
+            document_type: DocumentType::Json,
+            authoritative_content: replay_body.to_owned(),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
+            canonical_payload_hash: normalized_json_hash_from_str(replay_body)
+                .expect("formatted CLR should hash"),
+            ingest_kind: IngestKind::DirectStandard,
+        })
+        .await
+        .expect("formatting-only CLR replay should succeed");
+
+    assert!(!created.replayed);
+    assert!(replay.replayed);
+    assert_eq!(created.source_id, replay.source_id);
+    assert_eq!(created.memory_items, replay.memory_items);
+
+    let memory_item = query_service
+        .execute(&MemoryItemUrn::new(created.memory_items[0].urn.clone()))
+        .await
+        .expect("CLR memory item should be readable");
+
+    assert_eq!(memory_item.content, first_body);
+    assert_eq!(memory_item.document_type, DocumentType::Json);
+    assert_eq!(memory_item.unit_type, "json_document");
+}
+
+#[tokio::test]
+async fn clr_semantic_conflict_returns_conflict_without_overwriting_first_body() {
+    let db = Arc::new(InMemorySurrealDb::new());
+    let service = build_service(db.clone());
+    let query_service =
+        GetMemoryItemService::new(Arc::new(SurrealMemoryQueryRepository::new(db.clone())));
+
+    let first_body = fixture("clr_compact");
+    let conflicting_body = fixture("clr_conflict");
+
+    let created = service
+        .execute(RegisterSourceCommand {
+            external_id: "https://clr.example/credentials/123".to_owned(),
+            title: "Rust CLR".to_owned(),
+            summary: Some("clr conflict test".to_owned()),
+            document_type: DocumentType::Json,
+            authoritative_content: first_body.to_owned(),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
+            canonical_payload_hash: normalized_json_hash_from_str(first_body)
+                .expect("compact CLR should hash"),
+            ingest_kind: IngestKind::DirectStandard,
+        })
+        .await
+        .expect("first CLR registration should succeed");
+
+    let error = service
+        .execute(RegisterSourceCommand {
+            external_id: "https://clr.example/credentials/123".to_owned(),
+            title: "Rust CLR".to_owned(),
+            summary: Some("clr conflict test".to_owned()),
+            document_type: DocumentType::Json,
+            authoritative_content: conflicting_body.to_owned(),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
+            canonical_payload_hash: normalized_json_hash_from_str(conflicting_body)
+                .expect("conflicting CLR should hash"),
+            ingest_kind: IngestKind::DirectStandard,
+        })
+        .await
+        .expect_err("semantic conflict should fail");
+
+    assert_eq!(error.kind(), ErrorCode::Conflict);
+
+    let memory_item = query_service
+        .execute(&MemoryItemUrn::new(created.memory_items[0].urn.clone()))
+        .await
+        .expect("original CLR memory item should be readable");
+
+    assert_eq!(memory_item.content, first_body);
 }

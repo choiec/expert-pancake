@@ -75,6 +75,12 @@ struct BucketCount {
 }
 
 #[derive(Debug, Clone, Default)]
+/// Optional per-response metric labels consumed by the latency middleware.
+///
+/// Future handlers can attach bounded labels before returning a response:
+/// `MetricsLabels::new().with_document_type("markdown").with_ingest_kind("canonical")`
+/// and then insert them into `response.extensions_mut()` or call
+/// `MetricsLabels::insert_response_extension`.
 pub struct MetricsLabels {
     pub document_type: Option<String>,
     pub ingest_kind: Option<String>,
@@ -168,6 +174,26 @@ impl ProbeSnapshot {
             database,
             search,
         }
+    }
+}
+
+impl MetricsLabels {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_document_type(mut self, document_type: impl Into<String>) -> Self {
+        self.document_type = Some(document_type.into());
+        self
+    }
+
+    pub fn with_ingest_kind(mut self, ingest_kind: impl Into<String>) -> Self {
+        self.ingest_kind = Some(ingest_kind.into());
+        self
+    }
+
+    pub fn insert_response_extension(self, response: &mut axum::response::Response) {
+        response.extensions_mut().insert(self);
     }
 }
 

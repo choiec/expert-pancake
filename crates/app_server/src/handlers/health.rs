@@ -27,12 +27,18 @@ pub struct ReadinessComponents {
     pub search: ProbeStatus,
 }
 
+/// Probe routes are kept isolated here so probe semantics remain explicit and
+/// easy to validate against the OpenAPI contract.
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/health", get(health))
         .route("/ready", get(ready))
 }
 
+/// `/health` is local-only liveness.
+///
+/// It intentionally does not read application state or probe external services,
+/// so it stays fast and returns service-local status only.
 async fn health() -> Json<HealthResponse> {
     Json(HealthResponse {
         status: ProbeStatus::Ready,
@@ -42,6 +48,11 @@ async fn health() -> Json<HealthResponse> {
     })
 }
 
+/// `/ready` is authoritative readiness.
+///
+/// SurrealDB controls the HTTP status because it is the authoritative write path.
+/// Meilisearch degradation is surfaced in the body but does not fail readiness
+/// while the database remains ready, matching the published OpenAPI semantics.
 async fn ready(State(state): State<AppState>) -> (StatusCode, Json<ReadinessResponse>) {
     let probe = state.readiness().await;
     let status = overall_status(probe);

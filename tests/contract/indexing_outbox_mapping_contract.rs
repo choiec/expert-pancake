@@ -1,3 +1,8 @@
+//! Fixture-level authoritative outbox mapping proofs.
+//!
+//! These tests verify projection rehydration semantics against the in-memory
+//! fixture. Runtime client-backed wiring is implemented separately.
+
 use std::sync::Arc;
 use std::time::Duration;
 
