@@ -97,7 +97,7 @@
 
 ## Feature Readiness Assessment
 
-**Overall Status**: ✅ **READY FOR CLARIFICATION AND/OR PLANNING**
+**Overall Status**: ✅ **IMPLEMENT-READY**
 
 **Readiness Confidence**: High
 
@@ -112,16 +112,14 @@
 
 **Recommended Path Forward**:
 
-1. **Optional**: Run `/speckit.clarify` if stakeholders need to resolve Q1–Q3 before planning (idempotency policy, normalization rules, content transformation policy). Clarifications will refine implementation decisions but not change feature scope.
+1. **Next**: Run `/speckit.implement` to execute the approved implementation tasks for this feature.
 
-2. **Next**: Run `/speckit.plan` to generate technical design (database schema, API contract/OpenAPI, normalization algorithm, error handling patterns, deployment architecture) aligned with this specification.
-
-3. **Then**: Run `/speckit.tasks` to decompose plan into implementation tasks (backend endpoints, database migrations, tests, integrations).
+2. **Then**: Run `/speckit.checklist` or `/speckit.analyze` after implementation to validate contract, storage, and observability outcomes against these artifacts.
 
 ## Notes
 
-- Three clarification questions (Q1, Q2, Q3) are marked for optional resolution; defaults are provided and spec is complete without resolving them.
-- Assumption A5 (idempotency window = 1 minute) and A2 (simple normalization) are critical to implementation; clarifications should confirm these.
+- Direct Open Badges / CLR ingest is now closed for implementation with explicit `document_type = json`, `json_document` normalization, preserved-content semantics, and normalized replay hashing.
+- Public `indexing_status` vocabulary is aligned across spec, plan, data model, quickstart, and OpenAPI as `queued`, `indexed`, and `deferred`.
 - Constitution compliance:
   - ✓ Layered architecture (handlers → services → repositories) defined via FRs and error handling
   - ✓ Canonical domain model (Source, Memory Item, Search Index Entry) defined in Key Entities
@@ -130,5 +128,5 @@
   - ✓ Security (no PII in logs, immutability, transaction consistency) enforced in NC-011 to NC-014
 
 **Checklist Version**: 1.0.0  
-**Validated By**: speckit.specify  
+**Validated By**: speckit.checklist  
 **Date**: 2026-03-17
