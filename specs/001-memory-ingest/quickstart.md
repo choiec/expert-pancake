@@ -74,7 +74,7 @@ curl -i http://127.0.0.1:3000/sources/register \
   --data '{
     "title": "Axum Plan",
     "summary": "Planning notes",
-    "external-id": "demo-source-001",
+    "external-id": "https://api.cherry-pick.net/sources/example.edu/demo-source-001",
     "document-type": "markdown",
     "content": "# Intro\n\nHello world\n\n# Next\n\nMore text",
     "metadata": {"topic": "planning"}
@@ -87,6 +87,7 @@ Expected registration semantics:
 - Idempotent replay returns `200 OK` with the same `source_id` and `memory_items`.
 - Conflicting replay returns `409 Conflict`.
 - Public `indexing_status` is only `queued`, `indexed`, or `deferred`.
+- Canonical `external-id` examples use the project-owned URI namespace; original standard payload IDs remain separate provenance data.
 
 ## Smoke Test: Direct Open Badges Or CLR Registration
 

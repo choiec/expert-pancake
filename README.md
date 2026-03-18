@@ -73,12 +73,16 @@ curl -i http://127.0.0.1:3000/sources/register \
 	--data '{
 		"title": "Axum Plan",
 		"summary": "Planning notes",
-		"external-id": "demo-source-001",
+		"external-id": "https://api.cherry-pick.net/sources/example.edu/demo-source-001",
 		"document-type": "markdown",
 		"content": "# Intro\n\nHello world\n\n# Next\n\nMore text",
 		"metadata": {"topic": "planning"}
 	}'
 ```
+
+Project governance treats `external-id` as the canonical external URI under the
+project-owned namespace. For direct-standard ingest, the payload's original
+standard `id` remains provenance metadata and is not the canonical external ID.
 
 Register a direct-standard Open Badges payload:
 

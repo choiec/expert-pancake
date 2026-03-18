@@ -31,7 +31,12 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Confirm handler/service/repository boundaries remain intact and storage authority stays aligned with the constitution.
+- If the feature touches identifiers or replay semantics, document the separation of internal `source_id`, canonical `external_id`, and memory-item URN responsibilities.
+- If canonical identifiers change, specify project-owned namespace usage, deterministic normalization rules for source-domain and object-id inputs, and the governing `canonical_id_version` strategy.
+- If direct-standard ingest is affected, preserve original standard IDs separately from canonical `external_id` and document provenance handling.
+- Reject destructive identifier stripping or any implicit change to `source_id` generation or memory-item URN generation.
+- Require synchronized impact review for spec, contracts, tests, docs, and implementation tasks when identifier grammar or replay/conflict semantics change.
 
 ## Project Structure
 
