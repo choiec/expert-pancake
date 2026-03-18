@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use serde_json::Value;
 use time::OffsetDateTime;
 use tokio::time::timeout;
 use uuid::Uuid;
@@ -9,7 +10,8 @@ use core_shared::{AppError, AppResult, IdGenerator};
 
 use crate::domain::event::GraphProjectionEvent;
 use crate::domain::normalization::{NormalizationInput, normalize_source};
-use crate::domain::source::{DocumentType, IngestKind, NewSource, SourceSystemMetadata};
+use crate::domain::source::{CANONICAL_ID_VERSION, DocumentType, IngestKind, NewSource, SourceSystemMetadata};
+use crate::domain::source_identity::deterministic_source_id;
 use crate::infra::graph::GraphProjectionPort;
 use crate::infra::indexer::{IndexingPort, PublicIndexingStatus};
 use crate::infra::repo::{MemoryRepository, SourceBundle, SourceCreateOrReplay, SourceRepository};
@@ -36,8 +38,10 @@ pub struct RegisterSourceCommand {
     pub summary: Option<String>,
     pub document_type: DocumentType,
     pub authoritative_content: String,
-    pub source_metadata: serde_json::Value,
-    pub canonical_payload_hash: String,
+    pub source_metadata: Value,
+    pub semantic_payload_hash: String,
+    pub original_standard_id: Option<String>,
+    pub raw_body_hash: Option<String>,
     pub ingest_kind: IngestKind,
 }
 
@@ -49,8 +53,8 @@ impl RegisterSourceCommand {
         if self.title.trim().is_empty() {
             return Err(AppError::validation("title is required"));
         }
-        if self.canonical_payload_hash.trim().is_empty() {
-            return Err(AppError::validation("canonical_payload_hash is required"));
+        if self.semantic_payload_hash.trim().is_empty() {
+            return Err(AppError::validation("semantic_payload_hash is required"));
         }
         if self.authoritative_content.len() > MAX_AUTHORITATIVE_CONTENT_BYTES {
             return Err(AppError::validation(
@@ -73,9 +77,13 @@ pub struct RegisterSourceResult {
     pub source_id: Uuid,
     pub external_id: String,
     pub document_type: DocumentType,
+    pub source_metadata: Value,
     pub memory_items: Vec<RegisteredMemoryItem>,
     pub indexing_status: PublicIndexingStatus,
     pub replayed: bool,
+    pub decision_reason: String,
+    pub migration_phase: String,
+    pub legacy_resolution_path: String,
 }
 
 pub struct RegisterSourceService {
@@ -112,7 +120,11 @@ impl RegisterSourceService {
     pub async fn execute(&self, command: RegisterSourceCommand) -> AppResult<RegisterSourceResult> {
         command.validate()?;
         let created_at = self.clock.now();
-        let source_id = self.id_generator.new_uuid();
+        let canonical_external_id = command.external_id.clone();
+        let semantic_payload_hash = command.semantic_payload_hash.clone();
+        let original_standard_id = command.original_standard_id.clone();
+        let ingest_kind = command.ingest_kind;
+        let source_id = deterministic_source_id(CANONICAL_ID_VERSION, &command.external_id);
         let id_generator = self.id_generator.clone();
 
         let (new_source, memory_items) = timeout(self.timeout, async move {
@@ -123,10 +135,12 @@ impl RegisterSourceService {
                 command.summary.clone(),
                 command.document_type,
                 command.source_metadata.clone(),
-                SourceSystemMetadata {
-                    canonical_payload_hash: command.canonical_payload_hash.clone(),
-                    ingest_kind: command.ingest_kind,
-                },
+                SourceSystemMetadata::new(
+                    command.ingest_kind,
+                    command.semantic_payload_hash.clone(),
+                    command.original_standard_id.clone(),
+                    command.raw_body_hash.clone(),
+                )?,
                 created_at,
             )?;
             let memory_items = normalize_source(
@@ -152,7 +166,23 @@ impl RegisterSourceService {
             .prepare_create_or_replay(new_source.clone())
             .await?
         {
-            SourceCreateOrReplay::Replay(bundle) => Ok(Self::into_result(bundle, true)),
+            SourceCreateOrReplay::Replay(bundle) => {
+                tracing::info!(
+                    canonical_external_id = %canonical_external_id,
+                    canonical_id_version = CANONICAL_ID_VERSION,
+                    semantic_payload_hash = %semantic_payload_hash,
+                    ingest_kind = %ingest_kind.as_str(),
+                    decision_reason = "REPLAY_SEMANTIC_MATCH",
+                    migration_phase = %bundle.migration_phase,
+                    legacy_resolution_path = %bundle.legacy_resolution_path,
+                    "source registration replayed"
+                );
+                Ok(Self::into_result(
+                    bundle,
+                    true,
+                    "REPLAY_SEMANTIC_MATCH".to_owned(),
+                ))
+            }
             SourceCreateOrReplay::Create(source) => {
                 let job = self.indexing_port.create_job(source.source_id, created_at);
                 let bundle = self
@@ -162,16 +192,41 @@ impl RegisterSourceService {
                 let event =
                     GraphProjectionEvent::source_registered(&bundle.source, &bundle.memory_items);
                 let _ = self.graph_port.project(&event);
-                Ok(Self::into_result(bundle, false))
+                let decision_reason = match command.ingest_kind {
+                    IngestKind::Canonical => "MANUAL_CANONICAL_ACCEPTED",
+                    IngestKind::DirectStandard => "DIRECT_STANDARD_CANONICALIZED",
+                };
+                tracing::info!(
+                    source_id = %bundle.source.source_id,
+                    canonical_external_id = %bundle.source.external_id,
+                    canonical_id_version = CANONICAL_ID_VERSION,
+                    semantic_payload_hash = %semantic_payload_hash,
+                    original_standard_id = ?original_standard_id,
+                    ingest_kind = %ingest_kind.as_str(),
+                    decision_reason = decision_reason,
+                    migration_phase = %bundle.migration_phase,
+                    legacy_resolution_path = %bundle.legacy_resolution_path,
+                    "source registration created"
+                );
+                Ok(Self::into_result(
+                    bundle,
+                    false,
+                    decision_reason.to_owned(),
+                ))
             }
         }
     }
 
-    fn into_result(bundle: SourceBundle, replayed: bool) -> RegisterSourceResult {
+    fn into_result(
+        bundle: SourceBundle,
+        replayed: bool,
+        decision_reason: String,
+    ) -> RegisterSourceResult {
         RegisterSourceResult {
             source_id: bundle.source.source_id,
             external_id: bundle.source.external_id.clone(),
             document_type: bundle.source.document_type,
+            source_metadata: bundle.source.public_source_metadata(),
             memory_items: bundle
                 .memory_items
                 .iter()
@@ -183,6 +238,9 @@ impl RegisterSourceService {
                 .collect(),
             indexing_status: bundle.indexing_status,
             replayed,
+            decision_reason,
+            migration_phase: bundle.migration_phase,
+            legacy_resolution_path: bundle.legacy_resolution_path,
         }
     }
 }

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use serde_json::Value;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -30,9 +31,13 @@ pub struct GetSourceResult {
     pub title: String,
     pub summary: Option<String>,
     pub document_type: DocumentType,
+    pub source_metadata: Value,
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
     pub indexing_status: PublicIndexingStatus,
+    pub migration_phase: String,
+    pub legacy_resolution_path: String,
+    pub decision_reason: String,
     pub memory_items: Vec<SourceMemoryItemResult>,
 }
 
@@ -47,15 +52,25 @@ impl GetSourceService {
 
     pub async fn execute(&self, source_id: Uuid) -> AppResult<GetSourceResult> {
         let bundle = self.repo.get_source(source_id).await?;
+        let source = bundle.source;
+        let source_metadata = source.public_source_metadata();
         Ok(GetSourceResult {
-            source_id: bundle.source.source_id,
-            external_id: bundle.source.external_id,
-            title: bundle.source.title,
-            summary: bundle.source.summary,
-            document_type: bundle.source.document_type,
-            created_at: bundle.source.created_at,
-            updated_at: bundle.source.updated_at,
+            source_id: source.source_id,
+            external_id: source.external_id,
+            title: source.title,
+            summary: source.summary,
+            document_type: source.document_type,
+            source_metadata,
+            created_at: source.created_at,
+            updated_at: source.updated_at,
             indexing_status: bundle.indexing_status,
+            decision_reason: if bundle.legacy_resolution_path == "remapped_source_id" {
+                "LOOKUP_RESOLVED_LEGACY_ALIAS".to_owned()
+            } else {
+                "LOOKUP_RESOLVED_CANONICAL".to_owned()
+            },
+            migration_phase: bundle.migration_phase,
+            legacy_resolution_path: bundle.legacy_resolution_path,
             memory_items: bundle
                 .memory_items
                 .into_iter()

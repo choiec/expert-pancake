@@ -24,7 +24,7 @@ async fn histogram_metrics_cover_all_public_endpoints_with_bounded_labels() {
         "/sources/register",
         json!({
             "title": "Metrics markdown",
-            "external-id": "metrics-001",
+            "external-id": "https://api.cherry-pick.net/cc/v1p3/example.edu:metrics-001",
             "document-type": "markdown",
             "content": "# Intro\n\nmetrics path"
         }),
@@ -88,7 +88,9 @@ async fn histogram_metrics_cover_all_public_endpoints_with_bounded_labels() {
             "/sources/register",
             201,
             Some("markdown"),
-            Some("canonical")
+            Some("canonical"),
+            Some("steady_state"),
+            Some("MANUAL_CANONICAL_ACCEPTED")
         ),
         1
     );
@@ -98,22 +100,32 @@ async fn histogram_metrics_cover_all_public_endpoints_with_bounded_labels() {
             "/sources/register",
             201,
             Some("json"),
-            Some("direct_standard")
+            Some("direct_standard"),
+            Some("steady_state"),
+            Some("DIRECT_STANDARD_CANONICALIZED")
         ),
         1
     );
-    assert_eq!(metric_count(&metrics, "/health", 200, None, None), 1);
-    assert_eq!(metric_count(&metrics, "/ready", 200, None, None), 1);
+    assert_eq!(metric_count(&metrics, "/health", 200, None, None, None, None), 1);
+    assert_eq!(metric_count(&metrics, "/ready", 200, None, None, None, None), 1);
     assert_eq!(
-        metric_count(&metrics, "/sources/{source-id}", 200, Some("markdown"), None),
+        metric_count(
+            &metrics,
+            "/sources/{source-id}",
+            200,
+            Some("markdown"),
+            None,
+            Some("steady_state"),
+            Some("LOOKUP_RESOLVED_CANONICAL")
+        ),
         1
     );
     assert_eq!(
-        metric_count(&metrics, "/memory-items/{urn}", 200, Some("markdown"), None),
+        metric_count(&metrics, "/memory-items/{urn}", 200, Some("markdown"), None, None, None),
         1
     );
     assert_eq!(
-        metric_count(&metrics, "/search/memory-items", 200, Some("json"), None),
+        metric_count(&metrics, "/search/memory-items", 200, Some("json"), None, None, None),
         1
     );
 
@@ -166,9 +178,13 @@ fn metric_count(
     status_code: u16,
     document_type: Option<&str>,
     ingest_kind: Option<&str>,
+    migration_phase: Option<&str>,
+    decision_reason: Option<&str>,
 ) -> u64 {
     let document_type = document_type.unwrap_or("unknown");
     let ingest_kind = ingest_kind.unwrap_or("unknown");
+    let migration_phase = migration_phase.unwrap_or("unknown");
+    let decision_reason = decision_reason.unwrap_or("unknown");
 
     metrics
         .lines()
@@ -178,6 +194,8 @@ fn metric_count(
                 && line.contains(&format!("status_code=\"{status_code}\""))
                 && line.contains(&format!("document_type=\"{document_type}\""))
                 && line.contains(&format!("ingest_kind=\"{ingest_kind}\""))
+                && line.contains(&format!("migration_phase=\"{migration_phase}\""))
+                && line.contains(&format!("decision_reason=\"{decision_reason}\""))
         })
         .and_then(|line| line.rsplit_once(' '))
         .and_then(|(_, value)| value.parse::<u64>().ok())

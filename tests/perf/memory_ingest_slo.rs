@@ -305,7 +305,8 @@ fn inflate_canonical_markdown(template: &Value, index: u32, profile: &Value) -> 
     let target_bytes = profile["canonical_markdown_target_bytes"]
         .as_u64()
         .unwrap_or(98_304) as usize;
-    payload["external-id"] = json!(format!("perf-markdown-{index}"));
+    payload["external-id"] =
+        json!(format!("https://api.cherry-pick.net/cc/v1p3/example.edu:perf-markdown-{index}"));
     payload["title"] = json!(format!("Performance Markdown {index}"));
 
     let seed = payload["content"]
@@ -323,7 +324,9 @@ fn inflate_canonical_markdown(template: &Value, index: u32, profile: &Value) -> 
 
 fn inflate_search_corpus_payload(template: &Value, index: u32) -> Value {
     let mut payload = template.clone();
-    payload["external-id"] = json!(format!("synthetic-corpus-{index}"));
+    payload["external-id"] = json!(format!(
+        "https://api.cherry-pick.net/cc/v1p3/example.edu:synthetic-corpus-{index}"
+    ));
     payload["title"] = json!(format!("Synthetic Corpus {index}"));
     payload["content"] = json!(format!(
         "# Synthetic Corpus {index}\n\nsynthetic-corpus paragraph {index}\n\n# Retrieval\n\nsynthetic-corpus follow-up {index}"

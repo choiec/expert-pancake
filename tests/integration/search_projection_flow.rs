@@ -25,7 +25,7 @@ async fn healthy_indexing_makes_registered_content_searchable() {
         json!({
             "title": "Flow markdown",
             "summary": "healthy search",
-            "external-id": "flow-search-001",
+            "external-id": "https://api.cherry-pick.net/cc/v1p3/example.edu:flow-search-001",
             "document-type": "markdown",
             "content": "# Intro\n\nhello integration world"
         }),
@@ -120,7 +120,7 @@ async fn registration_still_succeeds_when_search_is_degraded() {
         "/sources/register",
         json!({
             "title": "Degraded search",
-            "external-id": "flow-search-degraded-001",
+            "external-id": "https://api.cherry-pick.net/cc/v1p3/example.edu:flow-search-degraded-001",
             "document-type": "text",
             "content": "search degradation should not block registration"
         }),

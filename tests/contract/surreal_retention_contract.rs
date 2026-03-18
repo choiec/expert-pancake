@@ -31,13 +31,15 @@ async fn authoritative_records_have_no_ttl_or_implicit_purge_baseline() {
 
     let result = service
         .execute(RegisterSourceCommand {
-            external_id: "retention-source".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:retention-source".to_owned(),
             title: "Retention".to_owned(),
             summary: Some("baseline".to_owned()),
             document_type: DocumentType::Markdown,
             authoritative_content: "# One\n\nalpha\n\n# Two\n\nbeta".to_owned(),
             source_metadata: serde_json::json!({"retention": "indefinite"}),
-            canonical_payload_hash: "retention-hash".to_owned(),
+            semantic_payload_hash: "retention-hash".to_owned(),
+            original_standard_id: None,
+            raw_body_hash: None,
             ingest_kind: IngestKind::Canonical,
         })
         .await
@@ -52,7 +54,7 @@ async fn authoritative_records_have_no_ttl_or_implicit_purge_baseline() {
     let retained_bundle = db
         .get_source_bundle(result.source_id)
         .expect("authoritative bundle should still exist");
-    assert_eq!(retained_bundle.source.external_id, "retention-source");
+    assert_eq!(retained_bundle.source.external_id, "https://api.cherry-pick.net/cc/v1p3/example.edu:retention-source");
     assert_eq!(retained_bundle.memory_items.len(), 2);
     assert!(db.rehydrate_projection(result.source_id).is_some());
 }

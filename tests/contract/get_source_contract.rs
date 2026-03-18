@@ -44,6 +44,7 @@ async fn get_source_returns_authoritative_ordered_shape() {
 
     assert_eq!(payload["source_id"], source_id);
     assert_eq!(payload["indexing_status"], "queued");
+    assert_eq!(payload["source_metadata"]["system"]["canonical_id_version"], "v1");
     assert_eq!(payload["memory_items"][0]["sequence"], 0);
     assert_eq!(payload["memory_items"][1]["sequence"], 1);
 }

@@ -132,6 +132,8 @@ pub async fn latency_metrics(
             status_code: response.status().as_u16(),
             document_type: labels.document_type,
             ingest_kind: labels.ingest_kind,
+            migration_phase: labels.migration_phase,
+            decision_reason: labels.decision_reason,
         },
         started_at.elapsed(),
     );

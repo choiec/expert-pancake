@@ -10,8 +10,9 @@ use core_shared::AppError;
 use mod_memory::{
     application::register_source::RegisterSourceCommand,
     domain::{
-        normalization::normalized_json_hash_from_str,
+        normalization::{normalized_json_hash_from_str, raw_body_hash_from_str},
         source::{DocumentType, IngestKind},
+        source_external_id::{CanonicalSourceExternalId, canonicalize_direct_standard_payload},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -53,6 +54,7 @@ struct RegisterSourceResponse {
     external_id: String,
     document_type: String,
     indexing_status: String,
+    source_metadata: Value,
     memory_items: Vec<MemoryItemSummary>,
 }
 
@@ -63,12 +65,6 @@ struct MemoryItemSummary {
     unit_type: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StandardFamily {
-    OpenBadges,
-    Clr,
-}
-
 async fn register_source(State(state): State<AppState>, request: Request) -> Response {
     let context = request
         .extensions()
@@ -76,13 +72,17 @@ async fn register_source(State(state): State<AppState>, request: Request) -> Res
         .cloned()
         .unwrap_or_else(RequestContext::fallback);
 
-    match register_source_inner(state, request).await {
+    match register_source_inner(state, request, context.clone()).await {
         Ok(response) => response,
         Err(error) => map_app_error(error, &context),
     }
 }
 
-async fn register_source_inner(state: AppState, request: Request) -> Result<Response, AppError> {
+async fn register_source_inner(
+    state: AppState,
+    request: Request,
+    context: RequestContext,
+) -> Result<Response, AppError> {
     ensure_json_content_type(request.headers())?;
 
     let body = to_bytes(request.into_body(), state.max_request_body_bytes())
@@ -106,6 +106,7 @@ async fn register_source_inner(state: AppState, request: Request) -> Result<Resp
         external_id: result.external_id,
         document_type: result.document_type.as_str().to_owned(),
         indexing_status: result.indexing_status.as_str().to_owned(),
+        source_metadata: result.source_metadata,
         memory_items: result
             .memory_items
             .into_iter()
@@ -122,6 +123,25 @@ async fn register_source_inner(state: AppState, request: Request) -> Result<Resp
         StatusCode::CREATED
     };
 
+    tracing::info!(
+        request_id = %context.request_id(),
+        trace_id = %extract_trace_id(context.traceparent().unwrap_or_default()),
+        handler = "source_register",
+        route = "/sources/register",
+        method = "POST",
+        source_id = %payload.source_id,
+        canonical_external_id = %payload.external_id,
+        original_standard_id = ?payload.source_metadata.pointer("/system/original_standard_id").and_then(|value| value.as_str()),
+        canonical_id_version = ?payload.source_metadata.pointer("/system/canonical_id_version").and_then(|value| value.as_str()),
+        semantic_payload_hash = ?payload.source_metadata.pointer("/system/semantic_payload_hash").and_then(|value| value.as_str()),
+        raw_body_hash_present = false,
+        migration_phase = %result.migration_phase,
+        legacy_resolution_path = %result.legacy_resolution_path,
+        decision_reason = %result.decision_reason,
+        ingest_kind = %ingest_kind.as_str(),
+        "register_source completed"
+    );
+
     let mut response = (status, Json(payload)).into_response();
     MetricsLabels::new()
         .with_document_type(result.document_type.as_str())
@@ -129,6 +149,8 @@ async fn register_source_inner(state: AppState, request: Request) -> Result<Resp
             IngestKind::Canonical => "canonical",
             IngestKind::DirectStandard => "direct_standard",
         })
+        .with_migration_phase(&result.migration_phase)
+        .with_decision_reason(&result.decision_reason)
         .insert_response_extension(&mut response);
     Ok(response)
 }
@@ -142,12 +164,10 @@ fn canonicalize_request(
             .map_err(|error| AppError::validation(format!("invalid canonical request: {error}")))?;
 
         let title = request.title.trim().to_owned();
-        let external_id = request.external_id.trim().to_owned();
+        let external_id = CanonicalSourceExternalId::parse_canonical_uri(request.external_id.trim())?
+            .canonical_uri();
         if title.is_empty() {
             return Err(AppError::validation("title is required"));
-        }
-        if external_id.is_empty() {
-            return Err(AppError::validation("external-id is required"));
         }
 
         return Ok((
@@ -161,122 +181,31 @@ fn canonicalize_request(
                 },
                 authoritative_content: request.content,
                 source_metadata: request.metadata.unwrap_or_else(empty_object),
-                canonical_payload_hash: normalized_json_hash_from_str(raw_body)?,
+                semantic_payload_hash: normalized_json_hash_from_str(raw_body)?,
+                original_standard_id: None,
+                raw_body_hash: None,
                 ingest_kind: IngestKind::Canonical,
             },
             IngestKind::Canonical,
         ));
     }
 
-    let standard = canonicalize_standard_payload(value, raw_body)?;
-    let _family = standard.family;
+    let standard = canonicalize_direct_standard_payload(value)?;
     Ok((
         RegisterSourceCommand {
-            external_id: standard.external_id,
+            external_id: standard.external_id.canonical_uri(),
             title: standard.title,
             summary: None,
             document_type: DocumentType::Json,
             authoritative_content: raw_body.to_owned(),
             source_metadata: json!({}),
-            canonical_payload_hash: normalized_json_hash_from_str(raw_body)?,
+            semantic_payload_hash: normalized_json_hash_from_str(raw_body)?,
+            original_standard_id: Some(standard.original_standard_id),
+            raw_body_hash: Some(raw_body_hash_from_str(raw_body)),
             ingest_kind: IngestKind::DirectStandard,
         },
         IngestKind::DirectStandard,
     ))
-}
-
-#[derive(Debug)]
-struct CanonicalizedStandard {
-    family: StandardFamily,
-    external_id: String,
-    title: String,
-}
-
-fn canonicalize_standard_payload(
-    value: &Value,
-    _raw_body: &str,
-) -> Result<CanonicalizedStandard, AppError> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| AppError::validation("request body must be a JSON object"))?;
-
-    let _contexts = string_or_string_array(object, "@context")?;
-    let types = string_or_string_array(object, "type")?;
-    let external_id = required_trimmed_string(object, "id")?;
-    let title = required_trimmed_string(object, "name")?;
-    let family = classify_standard_family(object, &types)?;
-
-    Ok(CanonicalizedStandard {
-        family,
-        external_id,
-        title,
-    })
-}
-
-fn classify_standard_family(
-    object: &Map<String, Value>,
-    types: &[String],
-) -> Result<StandardFamily, AppError> {
-    let has_badge_marker = types.iter().any(|value| {
-        matches!(
-            value.as_str(),
-            "OpenBadgeCredential" | "AchievementCredential"
-        )
-    });
-    let has_clr_marker = object.get("credentialSubject").is_some()
-        || types
-            .iter()
-            .any(|value| matches!(value.as_str(), "ClrCredential" | "CLRCredential"));
-
-    if has_clr_marker {
-        return Ok(StandardFamily::Clr);
-    }
-    if has_badge_marker {
-        return Ok(StandardFamily::OpenBadges);
-    }
-
-    Err(AppError::validation(
-        "supported-standard payload could not be mapped to a supported family",
-    )
-    .with_error_code("INVALID_STANDARD_PAYLOAD"))
-}
-
-fn string_or_string_array(
-    object: &Map<String, Value>,
-    field: &str,
-) -> Result<Vec<String>, AppError> {
-    let value = object
-        .get(field)
-        .ok_or_else(|| AppError::validation(format!("{field} is required")))?;
-
-    match value {
-        Value::String(single) => Ok(vec![single.clone()]),
-        Value::Array(values) => values
-            .iter()
-            .map(|value| match value {
-                Value::String(item) => Ok(item.clone()),
-                _ => Err(AppError::validation(format!(
-                    "{field} entries must be strings"
-                ))),
-            })
-            .collect(),
-        _ => Err(AppError::validation(format!(
-            "{field} must be a string or array of strings"
-        ))),
-    }
-}
-
-fn required_trimmed_string(object: &Map<String, Value>, field: &str) -> Result<String, AppError> {
-    let value = object
-        .get(field)
-        .and_then(Value::as_str)
-        .ok_or_else(|| AppError::validation(format!("{field} must be a string")))?;
-    let trimmed = value.trim().to_owned();
-    if trimmed.is_empty() {
-        return Err(AppError::validation(format!("{field} must not be empty"))
-            .with_error_code("INVALID_STANDARD_PAYLOAD"));
-    }
-    Ok(trimmed)
 }
 
 fn trimmed_option(value: String) -> Option<String> {
@@ -300,6 +229,10 @@ fn is_canonical_shape(value: &Value) -> bool {
     object.contains_key("document-type")
         || object.contains_key("external-id")
         || object.contains_key("content")
+}
+
+fn extract_trace_id(traceparent: &str) -> String {
+    traceparent.split('-').nth(1).unwrap_or_default().to_owned()
 }
 
 fn ensure_json_content_type(headers: &HeaderMap) -> Result<(), AppError> {

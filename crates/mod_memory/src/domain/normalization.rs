@@ -1,6 +1,7 @@
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
+use url::Url;
 use uuid::Uuid;
 
 use core_shared::{AppError, AppResult, IdGenerator};
@@ -67,6 +68,89 @@ pub fn normalized_json_hash_from_str(raw_body: &str) -> AppResult<String> {
     let value: Value = serde_json::from_str(raw_body)
         .map_err(|error| AppError::validation(format!("invalid JSON payload: {error}")))?;
     Ok(sha256_hex(canonical_json_string(&value).as_bytes()))
+}
+
+pub fn raw_body_hash_from_str(raw_body: &str) -> String {
+    sha256_hex(raw_body.as_bytes())
+}
+
+pub fn normalize_source_domain(input: &str) -> AppResult<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::validation("source_domain is required"));
+    }
+
+    let candidate = if trimmed.contains("://") {
+        trimmed.to_owned()
+    } else {
+        format!("https://{trimmed}")
+    };
+
+    let parsed = Url::parse(&candidate)
+        .map_err(|error| AppError::validation(format!("invalid source_domain: {error}")))?;
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(AppError::validation("source_domain must not include userinfo"));
+    }
+    if parsed.query().is_some() {
+        return Err(AppError::validation(
+            "source_domain must not be derived from query parameters",
+        ));
+    }
+    if parsed.fragment().is_some() {
+        return Err(AppError::validation("source_domain must not include fragments"));
+    }
+    if parsed.path() != "/" && !parsed.path().is_empty() {
+        return Err(AppError::validation(
+            "source_domain must not include path components",
+        ));
+    }
+
+    let Some(host) = parsed.host_str() else {
+        return Err(AppError::validation("source_domain must include a host"));
+    };
+
+    let without_trailing_dot = host.trim_end_matches('.').to_ascii_lowercase();
+    let normalized = without_trailing_dot
+        .strip_prefix("www.")
+        .unwrap_or(&without_trailing_dot)
+        .to_owned();
+    let ascii = idna::domain_to_ascii(&normalized)
+        .map_err(|error| AppError::validation(format!("invalid source_domain: {error}")))?;
+    if ascii.is_empty() || ascii.contains('/') || ascii.contains('?') {
+        return Err(AppError::validation("source_domain is ambiguous"));
+    }
+
+    Ok(ascii)
+}
+
+pub fn normalize_object_id(input: &str) -> AppResult<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::validation("object_id is required"));
+    }
+    if trimmed.as_bytes().len() > 256 {
+        return Err(AppError::validation(
+            "object_id exceeds the 256-byte raw length limit",
+        ));
+    }
+
+    let mut normalized = String::new();
+    for byte in trimmed.as_bytes() {
+        match *byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                normalized.push(*byte as char);
+            }
+            value => normalized.push_str(&format!("%{value:02X}")),
+        }
+    }
+
+    if normalized.len() > 1024 {
+        return Err(AppError::validation(
+            "object_id exceeds the 1024-character normalized length limit",
+        ));
+    }
+
+    Ok(normalized)
 }
 
 fn build_placeholder_item(

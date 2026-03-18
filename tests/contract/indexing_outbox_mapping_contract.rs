@@ -34,13 +34,15 @@ async fn outbox_rows_can_rehydrate_projection_inputs_from_authoritative_rows() {
 
     let result = service
         .execute(RegisterSourceCommand {
-            external_id: "projection-source".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:projection-source".to_owned(),
             title: "Projection".to_owned(),
             summary: None,
             document_type: DocumentType::Markdown,
             authoritative_content: "# Intro\n\nHello world".to_owned(),
             source_metadata: serde_json::json!({"projection": true}),
-            canonical_payload_hash: "projection-hash".to_owned(),
+            semantic_payload_hash: "projection-hash".to_owned(),
+            original_standard_id: None,
+            raw_body_hash: None,
             ingest_kind: IngestKind::Canonical,
         })
         .await

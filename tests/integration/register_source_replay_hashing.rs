@@ -7,7 +7,7 @@ use mod_memory::application::get_memory_item::GetMemoryItemService;
 use mod_memory::application::register_source::{
     RegisterSourceCommand, RegisterSourceService, SystemClock,
 };
-use mod_memory::domain::normalization::normalized_json_hash_from_str;
+use mod_memory::domain::normalization::{normalized_json_hash_from_str, raw_body_hash_from_str};
 use mod_memory::domain::source::{DocumentType, IngestKind};
 use mod_memory::infra::indexer::OutboxOnlyIndexer;
 use mod_memory::infra::surreal_memory_query::SurrealMemoryQueryRepository;
@@ -50,6 +50,11 @@ fn build_service(db: Arc<InMemorySurrealDb>) -> RegisterSourceService {
     )
 }
 
+const BADGE_EXTERNAL_ID: &str =
+    "https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Abadge%3A001";
+const CLR_EXTERNAL_ID: &str =
+    "https://api.cherry-pick.net/clr/v2p0/issuer.example.org:https%3A%2F%2Fclr.example%2Fcredentials%2F123";
+
 #[tokio::test]
 async fn formatting_only_replay_returns_the_first_authoritative_json_body() {
     let db = Arc::new(InMemorySurrealDb::new());
@@ -63,13 +68,15 @@ async fn formatting_only_replay_returns_the_first_authoritative_json_body() {
 
     let created = service
         .execute(RegisterSourceCommand {
-            external_id: "urn:badge:001".to_owned(),
+            external_id: BADGE_EXTERNAL_ID.to_owned(),
             title: "Rust Badge".to_owned(),
             summary: Some("direct standard replay test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: first_body.to_owned(),
             source_metadata: serde_json::json!({"issuer": "issuer.example.org"}),
-            canonical_payload_hash: canonical_hash.clone(),
+            semantic_payload_hash: canonical_hash.clone(),
+            original_standard_id: Some("urn:badge:001".to_owned()),
+            raw_body_hash: Some(raw_body_hash_from_str(first_body)),
             ingest_kind: IngestKind::DirectStandard,
         })
         .await
@@ -77,14 +84,16 @@ async fn formatting_only_replay_returns_the_first_authoritative_json_body() {
 
     let replay = service
         .execute(RegisterSourceCommand {
-            external_id: "urn:badge:001".to_owned(),
+            external_id: BADGE_EXTERNAL_ID.to_owned(),
             title: "Rust Badge".to_owned(),
             summary: Some("direct standard replay test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: replay_body.to_owned(),
             source_metadata: serde_json::json!({"issuer": "issuer.example.org"}),
-            canonical_payload_hash: normalized_json_hash_from_str(replay_body)
+            semantic_payload_hash: normalized_json_hash_from_str(replay_body)
                 .expect("replay payload hashes"),
+            original_standard_id: Some("urn:badge:001".to_owned()),
+            raw_body_hash: Some(raw_body_hash_from_str(replay_body)),
             ingest_kind: IngestKind::DirectStandard,
         })
         .await
@@ -117,14 +126,16 @@ async fn clr_formatting_only_replay_preserves_the_first_authoritative_raw_body()
 
     let created = service
         .execute(RegisterSourceCommand {
-            external_id: "https://clr.example/credentials/123".to_owned(),
+            external_id: CLR_EXTERNAL_ID.to_owned(),
             title: "Rust CLR".to_owned(),
             summary: Some("clr replay test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: first_body.to_owned(),
             source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
-            canonical_payload_hash: normalized_json_hash_from_str(first_body)
+            semantic_payload_hash: normalized_json_hash_from_str(first_body)
                 .expect("compact CLR should hash"),
+            original_standard_id: Some("https://clr.example/credentials/123".to_owned()),
+            raw_body_hash: Some(raw_body_hash_from_str(first_body)),
             ingest_kind: IngestKind::DirectStandard,
         })
         .await
@@ -132,14 +143,16 @@ async fn clr_formatting_only_replay_preserves_the_first_authoritative_raw_body()
 
     let replay = service
         .execute(RegisterSourceCommand {
-            external_id: "https://clr.example/credentials/123".to_owned(),
+            external_id: CLR_EXTERNAL_ID.to_owned(),
             title: "Rust CLR".to_owned(),
             summary: Some("clr replay test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: replay_body.to_owned(),
             source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
-            canonical_payload_hash: normalized_json_hash_from_str(replay_body)
+            semantic_payload_hash: normalized_json_hash_from_str(replay_body)
                 .expect("formatted CLR should hash"),
+            original_standard_id: Some("https://clr.example/credentials/123".to_owned()),
+            raw_body_hash: Some(raw_body_hash_from_str(replay_body)),
             ingest_kind: IngestKind::DirectStandard,
         })
         .await
@@ -172,14 +185,16 @@ async fn clr_semantic_conflict_returns_conflict_without_overwriting_first_body()
 
     let created = service
         .execute(RegisterSourceCommand {
-            external_id: "https://clr.example/credentials/123".to_owned(),
+            external_id: CLR_EXTERNAL_ID.to_owned(),
             title: "Rust CLR".to_owned(),
             summary: Some("clr conflict test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: first_body.to_owned(),
             source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
-            canonical_payload_hash: normalized_json_hash_from_str(first_body)
+            semantic_payload_hash: normalized_json_hash_from_str(first_body)
                 .expect("compact CLR should hash"),
+            original_standard_id: Some("https://clr.example/credentials/123".to_owned()),
+            raw_body_hash: Some(raw_body_hash_from_str(first_body)),
             ingest_kind: IngestKind::DirectStandard,
         })
         .await
@@ -187,14 +202,16 @@ async fn clr_semantic_conflict_returns_conflict_without_overwriting_first_body()
 
     let error = service
         .execute(RegisterSourceCommand {
-            external_id: "https://clr.example/credentials/123".to_owned(),
+            external_id: CLR_EXTERNAL_ID.to_owned(),
             title: "Rust CLR".to_owned(),
             summary: Some("clr conflict test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: conflicting_body.to_owned(),
             source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
-            canonical_payload_hash: normalized_json_hash_from_str(conflicting_body)
+            semantic_payload_hash: normalized_json_hash_from_str(conflicting_body)
                 .expect("conflicting CLR should hash"),
+            original_standard_id: Some("https://clr.example/credentials/123".to_owned()),
+            raw_body_hash: Some(raw_body_hash_from_str(conflicting_body)),
             ingest_kind: IngestKind::DirectStandard,
         })
         .await
@@ -222,14 +239,16 @@ async fn open_badges_semantic_conflict_returns_conflict_without_overwriting_firs
 
     let created = service
         .execute(RegisterSourceCommand {
-            external_id: "urn:badge:001".to_owned(),
+            external_id: BADGE_EXTERNAL_ID.to_owned(),
             title: "Rust Badge".to_owned(),
             summary: Some("badge conflict test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: first_body.to_owned(),
             source_metadata: serde_json::json!({"issuer": "issuer.example.org"}),
-            canonical_payload_hash: normalized_json_hash_from_str(first_body)
+            semantic_payload_hash: normalized_json_hash_from_str(first_body)
                 .expect("compact badge should hash"),
+            original_standard_id: Some("urn:badge:001".to_owned()),
+            raw_body_hash: Some(raw_body_hash_from_str(first_body)),
             ingest_kind: IngestKind::DirectStandard,
         })
         .await
@@ -237,14 +256,16 @@ async fn open_badges_semantic_conflict_returns_conflict_without_overwriting_firs
 
     let error = service
         .execute(RegisterSourceCommand {
-            external_id: "urn:badge:001".to_owned(),
+            external_id: BADGE_EXTERNAL_ID.to_owned(),
             title: "Rust Badge".to_owned(),
             summary: Some("badge conflict test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: conflicting_body.to_owned(),
             source_metadata: serde_json::json!({"issuer": "issuer.example.org"}),
-            canonical_payload_hash: normalized_json_hash_from_str(conflicting_body)
+            semantic_payload_hash: normalized_json_hash_from_str(conflicting_body)
                 .expect("conflicting badge should hash"),
+            original_standard_id: Some("urn:badge:001".to_owned()),
+            raw_body_hash: Some(raw_body_hash_from_str(conflicting_body)),
             ingest_kind: IngestKind::DirectStandard,
         })
         .await

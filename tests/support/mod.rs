@@ -20,7 +20,7 @@ use tower::ServiceExt;
 pub fn load_contract() -> String {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let path =
-        format!("{manifest_dir}/specs/001-memory-ingest/contracts/memory-ingest.openapi.yaml");
+        format!("{manifest_dir}/specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml");
 
     fs::read_to_string(path).expect("contract file must exist")
 }

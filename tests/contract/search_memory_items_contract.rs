@@ -33,7 +33,7 @@ async fn search_contract_matches_openapi_and_returns_projection_hits() {
         json!({
             "title": "Searchable markdown",
             "summary": "contract",
-            "external-id": "search-contract-001",
+            "external-id": "https://api.cherry-pick.net/cc/v1p3/example.edu:search-contract-001",
             "document-type": "markdown",
             "content": "# Intro\n\nhello projection world",
             "metadata": {"topic": "contract"}
@@ -162,7 +162,7 @@ async fn search_contract_returns_structured_503_when_projection_is_unavailable()
 fn load_contract() -> String {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let path =
-        format!("{manifest_dir}/specs/001-memory-ingest/contracts/memory-ingest.openapi.yaml");
+        format!("{manifest_dir}/specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml");
     fs::read_to_string(path).expect("contract file must exist")
 }
 

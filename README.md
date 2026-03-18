@@ -73,7 +73,7 @@ curl -i http://127.0.0.1:3000/sources/register \
 	--data '{
 		"title": "Axum Plan",
 		"summary": "Planning notes",
-		"external-id": "https://api.cherry-pick.net/sources/example.edu/demo-source-001",
+		"external-id": "https://api.cherry-pick.net/cc/v1p3/example.edu:demo-source-001",
 		"document-type": "markdown",
 		"content": "# Intro\n\nHello world\n\n# Next\n\nMore text",
 		"metadata": {"topic": "planning"}
@@ -101,10 +101,11 @@ curl -i http://127.0.0.1:3000/sources/register \
 Expected registration contract:
 
 - First successful ingest returns `201 Created`.
-- Idempotent replay of the same canonical payload hash returns `200 OK` with the same `source_id` and `memory_items`.
+- Idempotent replay of the same semantic payload hash returns `200 OK` with the same `source_id` and `memory_items`.
 - Conflicting replay for the same `external-id` returns `409 Conflict`.
 - Public `indexing_status` is always one of `queued`, `indexed`, or `deferred`.
 - Direct-standard success always returns `document_type: json` and exactly one `json_document` memory item.
+- Public provenance is exposed under `source_metadata.system` with `canonical_id_version`, `ingest_kind`, `semantic_payload_hash`, and `original_standard_id` when present.
 
 Retrieve authoritative records:
 

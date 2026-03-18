@@ -83,6 +83,16 @@ pub struct PersistedSourceBundle {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistedAuthoritativeState {
+    pub sources: Vec<PersistedSourceRecord>,
+    pub memory_items: Vec<PersistedMemoryItemRecord>,
+    pub index_jobs: Vec<PersistedIndexJobRecord>,
+    pub source_id_remaps: HashMap<Uuid, Uuid>,
+    pub migration_phase: String,
+    pub snapshot_ready: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectionRehydrationBundle {
     pub source: PersistedSourceRecord,
     pub memory_items: Vec<PersistedMemoryItemRecord>,
@@ -101,9 +111,12 @@ struct SurrealState {
     memory_by_urn: HashMap<String, PersistedMemoryItemRecord>,
     memory_urns_by_source_id: HashMap<Uuid, Vec<String>>,
     jobs_by_source_id: HashMap<Uuid, Vec<PersistedIndexJobRecord>>,
+    source_id_remaps: HashMap<Uuid, Uuid>,
     write_available: bool,
     search_available: bool,
     fail_next_commit: bool,
+    migration_phase: String,
+    snapshot_ready: bool,
 }
 
 impl Default for SurrealState {
@@ -114,9 +127,12 @@ impl Default for SurrealState {
             memory_by_urn: HashMap::new(),
             memory_urns_by_source_id: HashMap::new(),
             jobs_by_source_id: HashMap::new(),
+            source_id_remaps: HashMap::new(),
             write_available: true,
             search_available: true,
             fail_next_commit: false,
+            migration_phase: "steady_state".to_owned(),
+            snapshot_ready: true,
         }
     }
 }
@@ -169,6 +185,79 @@ impl InMemorySurrealDb {
         state.fail_next_commit = true;
     }
 
+    pub fn set_snapshot_ready(&self, ready: bool) {
+        let mut state = self.state.lock().expect("surreal state poisoned");
+        state.snapshot_ready = ready;
+    }
+
+    pub fn set_migration_phase(&self, phase: impl Into<String>) {
+        let mut state = self.state.lock().expect("surreal state poisoned");
+        state.migration_phase = phase.into();
+    }
+
+    pub fn migration_phase(&self) -> String {
+        self.state
+            .lock()
+            .expect("surreal state poisoned")
+            .migration_phase
+            .clone()
+    }
+
+    pub fn export_state(&self) -> PersistedAuthoritativeState {
+        let state = self.state.lock().expect("surreal state poisoned");
+        PersistedAuthoritativeState {
+            sources: state.sources_by_id.values().cloned().collect(),
+            memory_items: state.memory_by_urn.values().cloned().collect(),
+            index_jobs: state
+                .jobs_by_source_id
+                .values()
+                .flat_map(|jobs| jobs.iter().cloned())
+                .collect(),
+            source_id_remaps: state.source_id_remaps.clone(),
+            migration_phase: state.migration_phase.clone(),
+            snapshot_ready: state.snapshot_ready,
+        }
+    }
+
+    pub fn replace_state(&self, snapshot: PersistedAuthoritativeState) {
+        let mut next_state = SurrealState::default();
+        next_state.write_available = true;
+        next_state.search_available = true;
+        next_state.migration_phase = snapshot.migration_phase;
+        next_state.snapshot_ready = snapshot.snapshot_ready;
+        next_state.source_id_remaps = snapshot.source_id_remaps;
+
+        for source in snapshot.sources {
+            next_state
+                .source_ids_by_external_id
+                .insert(source.external_id.clone(), source.source_id);
+            next_state.sources_by_id.insert(source.source_id, source);
+        }
+
+        for item in snapshot.memory_items {
+            next_state
+                .memory_urns_by_source_id
+                .entry(item.source_id)
+                .or_default()
+                .push(item.urn.clone());
+            next_state.memory_by_urn.insert(item.urn.clone(), item);
+        }
+
+        for jobs in snapshot.index_jobs.into_iter().fold(
+            HashMap::<Uuid, Vec<PersistedIndexJobRecord>>::new(),
+            |mut acc, job| {
+                acc.entry(job.source_id).or_default().push(job);
+                acc
+            },
+        ) {
+            let (source_id, mut source_jobs) = jobs;
+            source_jobs.sort_by_key(|job| job.created_at);
+            next_state.jobs_by_source_id.insert(source_id, source_jobs);
+        }
+
+        *self.state.lock().expect("surreal state poisoned") = next_state;
+    }
+
     pub fn lookup_source_by_external_id(&self, external_id: &str) -> Option<PersistedSourceBundle> {
         let state = self.state.lock().expect("surreal state poisoned");
         let source_id = state.source_ids_by_external_id.get(external_id)?;
@@ -178,6 +267,24 @@ impl InMemorySurrealDb {
     pub fn get_source_bundle(&self, source_id: Uuid) -> Option<PersistedSourceBundle> {
         let state = self.state.lock().expect("surreal state poisoned");
         Self::bundle_from_state(&state, source_id)
+    }
+
+    pub fn get_source_bundle_with_resolution(
+        &self,
+        source_id: Uuid,
+    ) -> Option<(PersistedSourceBundle, String, String)> {
+        let state = self.state.lock().expect("surreal state poisoned");
+        if let Some(bundle) = Self::bundle_from_state(&state, source_id) {
+            return Some((bundle, state.migration_phase.clone(), "canonical_only".to_owned()));
+        }
+
+        let target_source_id = state.source_id_remaps.get(&source_id).copied()?;
+        let bundle = Self::bundle_from_state(&state, target_source_id)?;
+        Some((
+            bundle,
+            state.migration_phase.clone(),
+            "remapped_source_id".to_owned(),
+        ))
     }
 
     pub fn get_memory_item(
@@ -278,6 +385,18 @@ impl InMemorySurrealDb {
                 "SurrealDB write path is unavailable",
             ));
         }
+        if matches!(state.migration_phase.as_str(), "rewrite" | "verification") {
+            return Err(AppError::storage_unavailable(
+                "registration writes are denied during the migration window",
+            )
+            .with_error_code("MIGRATION_WRITE_DENIED"));
+        }
+        if !state.snapshot_ready {
+            return Err(AppError::storage_unavailable(
+                "snapshot or backup gate failed before migration execution",
+            )
+            .with_error_code("MIGRATION_BACKUP_GATE_FAILED"));
+        }
         if state.fail_next_commit {
             state.fail_next_commit = false;
             return Err(AppError::storage_unavailable(
@@ -295,19 +414,19 @@ impl InMemorySurrealDb {
             let existing_hash = existing
                 .source
                 .source_metadata
-                .pointer("/system/canonical_payload_hash")
+                .pointer("/system/semantic_payload_hash")
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default();
             let requested_hash = source
                 .source_metadata
-                .pointer("/system/canonical_payload_hash")
+                .pointer("/system/semantic_payload_hash")
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or_default();
             if existing_hash == requested_hash {
                 return Ok(CommitRegistrationOutcome::Replay(existing));
             }
             return Err(AppError::conflict(format!(
-                "external_id '{}' is already bound to a different canonical payload",
+                "external_id '{}' is already bound to a different semantic payload",
                 source.external_id
             )));
         }

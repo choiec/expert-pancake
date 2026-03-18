@@ -13,6 +13,8 @@ pub struct SourceBundle {
     pub source: Source,
     pub memory_items: Vec<MemoryItem>,
     pub indexing_status: PublicIndexingStatus,
+    pub migration_phase: String,
+    pub legacy_resolution_path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

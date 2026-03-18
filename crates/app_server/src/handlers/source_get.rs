@@ -22,13 +22,17 @@ async fn get_source(
     Path(source_id): Path<String>,
     Extension(context): Extension<RequestContext>,
 ) -> Response {
-    match get_source_inner(state, source_id).await {
+    match get_source_inner(state, source_id, context.clone()).await {
         Ok(response) => response,
         Err(error) => map_app_error(error, &context),
     }
 }
 
-async fn get_source_inner(state: AppState, source_id: String) -> Result<Response, AppError> {
+async fn get_source_inner(
+    state: AppState,
+    source_id: String,
+    context: RequestContext,
+) -> Result<Response, AppError> {
     let source_id = Uuid::parse_str(&source_id)
         .map_err(|_| AppError::validation("source-id must be a valid UUID"))?;
     let result = state
@@ -65,14 +69,41 @@ async fn get_source_inner(state: AppState, source_id: String) -> Result<Response
         "title": result.title,
         "summary": result.summary,
         "document_type": result.document_type.as_str(),
+        "source_metadata": result.source_metadata,
         "created_at": result.created_at,
+        "updated_at": result.updated_at,
         "indexing_status": result.indexing_status.as_str(),
         "memory_items": memory_items,
     });
 
+    tracing::info!(
+        request_id = %context.request_id(),
+        trace_id = %extract_trace_id(context.traceparent().unwrap_or_default()),
+        handler = "source_get",
+        route = "/sources/{source-id}",
+        method = "GET",
+        source_id = %result.source_id,
+        canonical_external_id = %result.external_id,
+        original_standard_id = ?result.source_metadata.pointer("/system/original_standard_id").and_then(|value| value.as_str()),
+        canonical_id_version = ?result.source_metadata.pointer("/system/canonical_id_version").and_then(|value| value.as_str()),
+        semantic_payload_hash = ?result.source_metadata.pointer("/system/semantic_payload_hash").and_then(|value| value.as_str()),
+        raw_body_hash_present = false,
+        migration_phase = %result.migration_phase,
+        legacy_resolution_path = %result.legacy_resolution_path,
+        decision_reason = %result.decision_reason,
+        ingest_kind = ?result.source_metadata.pointer("/system/ingest_kind").and_then(|value| value.as_str()),
+        "get_source completed"
+    );
+
     let mut response = Json(payload).into_response();
     MetricsLabels::new()
         .with_document_type(result.document_type.as_str())
+        .with_migration_phase(&result.migration_phase)
+        .with_decision_reason(&result.decision_reason)
         .insert_response_extension(&mut response);
     Ok(response)
+}
+
+fn extract_trace_id(traceparent: &str) -> String {
+    traceparent.split('-').nth(1).unwrap_or_default().to_owned()
 }

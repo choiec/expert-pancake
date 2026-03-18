@@ -34,10 +34,16 @@ async fn canonical_registration_returns_created_shape() {
     let response = send_json(app, Method::POST, "/sources/register", &body).await;
     let payload = assert_status_json(response, StatusCode::CREATED).await;
 
-    assert_eq!(payload["external_id"], "canonical-source-001");
+    assert_eq!(
+        payload["external_id"],
+        "https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01"
+    );
     assert_eq!(payload["document_type"], "markdown");
     assert_eq!(payload["indexing_status"], "queued");
     assert_eq!(payload["memory_items"][0]["unit_type"], "section");
+    assert_eq!(payload["source_metadata"]["system"]["canonical_id_version"], "v1");
+    assert_eq!(payload["source_metadata"]["system"]["ingest_kind"], "canonical");
+    assert!(payload["source_metadata"]["system"]["semantic_payload_hash"].is_string());
 }
 
 #[tokio::test]
@@ -109,6 +115,14 @@ async fn direct_standard_registration_returns_json_document_summary() {
 
     assert_eq!(open_badges_payload["document_type"], "json");
     assert_eq!(
+        open_badges_payload["external_id"],
+        "https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Aexample%3Abadge%3A001"
+    );
+    assert_eq!(
+        open_badges_payload["source_metadata"]["system"]["original_standard_id"],
+        "urn:example:badge:001"
+    );
+    assert_eq!(
         open_badges_payload["memory_items"][0]["unit_type"],
         "json_document"
     );
@@ -123,6 +137,10 @@ async fn direct_standard_registration_returns_json_document_summary() {
     let clr_payload = assert_status_json(clr, StatusCode::CREATED).await;
 
     assert_eq!(clr_payload["document_type"], "json");
+    assert_eq!(
+        clr_payload["external_id"],
+        "https://api.cherry-pick.net/clr/v2p0/issuer.example.org:https%3A%2F%2Fclr.example%2Fcredentials%2F123"
+    );
     assert_eq!(clr_payload["memory_items"][0]["unit_type"], "json_document");
 }
 
@@ -130,7 +148,7 @@ async fn direct_standard_registration_returns_json_document_summary() {
 async fn oversized_payload_returns_413() {
     let db = Arc::new(InMemorySurrealDb::new());
     let large_body = format!(
-        "{{\"title\":\"Large\",\"external-id\":\"too-large\",\"document-type\":\"text\",\"content\":\"{}\"}}",
+        "{{\"title\":\"Large\",\"external-id\":\"https://api.cherry-pick.net/cc/v1p3/example.edu:too-large\",\"document-type\":\"text\",\"content\":\"{}\"}}",
         "a".repeat(10 * 1024 * 1024 + 1)
     );
 

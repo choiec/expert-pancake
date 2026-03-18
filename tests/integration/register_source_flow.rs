@@ -40,7 +40,7 @@ async fn canonical_success_replay_and_conflict_preserve_single_authoritative_sou
     let conflict_payload = assert_status_json(conflict, StatusCode::CONFLICT).await;
 
     let stored = db
-        .lookup_source_by_external_id("canonical-source-001")
+        .lookup_source_by_external_id("https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01")
         .expect("authoritative source should exist");
 
     assert_eq!(replay_payload["source_id"], created_payload["source_id"]);

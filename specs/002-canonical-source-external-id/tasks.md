@@ -52,7 +52,7 @@
 
 ### Workstream A. Artifact and Contract Alignment
 
-- [ ] T001 Align canonical identity and replay terminology in specs/002-canonical-source-external-id/spec.md
+- [X] T001 Align canonical identity and replay terminology in specs/002-canonical-source-external-id/spec.md
   Title: Align spec.md with authoritative canonical identity decisions.
   Purpose: Close spec drift so the reviewer sees one definition for canonical `external_id`, provenance, deterministic `source_id`, replay or conflict, mixed-population posture, and observability boundaries.
   Files/Areas: `specs/002-canonical-source-external-id/spec.md`.
@@ -60,7 +60,7 @@
   Dependency: None.
   Risk Closed: Spec drift, contract drift, reviewer ambiguity.
 
-- [ ] T002 Align implementation invariants and rollout gates in specs/002-canonical-source-external-id/plan.md
+- [X] T002 Align implementation invariants and rollout gates in specs/002-canonical-source-external-id/plan.md
   Title: Align plan.md with the closed execution model.
   Purpose: Ensure the plan remains the implementation source for deterministic seed governance, replay semantics, migration stop conditions, observability fields, and rollout verification.
   Files/Areas: `specs/002-canonical-source-external-id/plan.md`.
@@ -68,7 +68,7 @@
   Dependency: T001.
   Risk Closed: Plan drift, implementation-order ambiguity, rollout-gate drift.
 
-- [ ] T003 Align entity, provenance, migration, and diagnostics fields in specs/002-canonical-source-external-id/data-model.md
+- [X] T003 Align entity, provenance, migration, and diagnostics fields in specs/002-canonical-source-external-id/data-model.md
   Title: Align data-model.md with authoritative storage and diagnostics semantics.
   Purpose: Freeze the stored field set and invariants that runtime code, migration code, and tests must share.
   Files/Areas: `specs/002-canonical-source-external-id/data-model.md`.
@@ -76,7 +76,7 @@
   Dependency: T001, T002.
   Risk Closed: Data-model drift, migration-report drift, provenance drift.
 
-- [ ] T004 Align closed rationale and reject criteria in specs/002-canonical-source-external-id/research.md
+- [X] T004 Align closed rationale and reject criteria in specs/002-canonical-source-external-id/research.md
   Title: Align research.md with the already-closed design decisions.
   Purpose: Record which drift each final decision closes so later reviewers do not reopen settled design choices.
   Files/Areas: `specs/002-canonical-source-external-id/research.md`.
@@ -84,7 +84,7 @@
   Dependency: T001, T002, T003.
   Risk Closed: Design-reopening risk, rationale drift, reviewer misread of why behavior changed.
 
-- [ ] T005 Align rollout instructions and operator verification flow in specs/002-canonical-source-external-id/quickstart.md
+- [X] T005 Align rollout instructions and operator verification flow in specs/002-canonical-source-external-id/quickstart.md
   Title: Align quickstart.md with rollout-critical execution and verification.
   Purpose: Turn the plan-approved migration and verification model into operator steps with clear pass or fail criteria.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`.
@@ -92,7 +92,7 @@
   Dependency: T002, T003, T004.
   Risk Closed: Operator-runbook drift, verification-gap risk, rollback confusion.
 
-- [ ] T006 Align public API schemas and examples in specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml
+- [X] T006 Align public API schemas and examples in specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml
   Title: Align memory-ingest OpenAPI with canonical identity and provenance parity.
   Purpose: Freeze the public contract so registration and retrieval expose canonical URI semantics without leaking internal diagnostics.
   Files/Areas: `specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml`.
@@ -100,7 +100,7 @@
   Dependency: T001, T003, T005.
   Risk Closed: Public contract drift, provenance drift, diagnostics leakage.
 
-- [ ] T007 Align canonical family and version registry rules in specs/002-canonical-source-external-id/contracts/canonical-vocabulary.yaml
+- [X] T007 Align canonical family and version registry rules in specs/002-canonical-source-external-id/contracts/canonical-vocabulary.yaml
   Title: Align canonical-vocabulary.yaml with the governed canonical URI grammar.
   Purpose: Make the canonical registry the single authoritative vocabulary and mapping artifact for runtime and test fixtures.
   Files/Areas: `specs/002-canonical-source-external-id/contracts/canonical-vocabulary.yaml`.
@@ -108,7 +108,7 @@
   Dependency: T001, T002.
   Risk Closed: Vocabulary drift, alias leakage, mapping drift.
 
-- [ ] T008 [P] Align review checklist and example fixtures in specs/002-canonical-source-external-id/checklists/requirements.md and tests/fixtures/register_source/
+- [X] T008 [P] Align review checklist and example fixtures in specs/002-canonical-source-external-id/checklists/requirements.md and tests/fixtures/register_source/
   Title: Align review checklist and fixtures with the final canonical model.
   Purpose: Ensure reviewer checklists and request or response examples validate the same canonical identity, provenance, replay, migration, and observability rules as the code will implement.
   Files/Areas: `specs/002-canonical-source-external-id/checklists/requirements.md`, `tests/fixtures/register_source/`.
@@ -118,7 +118,7 @@
 
 ### Workstream B. Domain Model, Normalization, and Identity Implementation
 
-- [ ] T009 [P] [US1] Introduce canonical identity value objects in crates/mod_memory/src/domain/source.rs, crates/mod_memory/src/domain/mod.rs, and crates/mod_memory/src/domain/source_external_id.rs
+- [X] T009 [P] [US1] Introduce canonical identity value objects in crates/mod_memory/src/domain/source.rs, crates/mod_memory/src/domain/mod.rs, and crates/mod_memory/src/domain/source_external_id.rs
   Title: Create domain-owned canonical identity types.
   Purpose: Move canonical URI ownership into the domain so handlers, application services, and repositories stop assembling identity strings ad hoc.
   Files/Areas: `crates/mod_memory/src/domain/source.rs`, `crates/mod_memory/src/domain/mod.rs`, `crates/mod_memory/src/domain/source_external_id.rs`.
@@ -126,7 +126,7 @@
   Dependency: T001 through T007.
   Risk Closed: Code drift across layers, handler-owned identity logic, repository-owned identity logic.
 
-- [ ] T010 [P] [US1] Implement source_domain normalization in crates/mod_memory/src/domain/normalization.rs and tests/unit/normalization_edges.rs
+- [X] T010 [P] [US1] Implement source_domain normalization in crates/mod_memory/src/domain/normalization.rs and tests/unit/normalization_edges.rs
   Title: Implement authoritative source-domain normalization.
   Purpose: Encode the governed host normalization pipeline once and reject unsafe or ambiguous authorities before identity creation.
   Files/Areas: `crates/mod_memory/src/domain/normalization.rs`, `tests/unit/normalization_edges.rs`.
@@ -134,7 +134,7 @@
   Dependency: T009.
   Risk Closed: Source-domain normalization drift, false equivalence, false acceptance of unsafe authorities.
 
-- [ ] T011 [P] [US1] Implement object_id non-lossy normalization in crates/mod_memory/src/domain/normalization.rs and tests/unit/normalization_edges.rs
+- [X] T011 [P] [US1] Implement object_id non-lossy normalization in crates/mod_memory/src/domain/normalization.rs and tests/unit/normalization_edges.rs
   Title: Implement authoritative object-id normalization.
   Purpose: Preserve semantically meaningful characters and spacing while producing deterministic URI-safe canonical identifiers.
   Files/Areas: `crates/mod_memory/src/domain/normalization.rs`, `tests/unit/normalization_edges.rs`.
@@ -142,7 +142,7 @@
   Dependency: T009.
   Risk Closed: Object-id collision risk, lossy normalization, namespace instability.
 
-- [ ] T012 [P] [US1] Implement canonical_id_version persistence and deterministic source_id derivation in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/domain/source_identity.rs
+- [X] T012 [P] [US1] Implement canonical_id_version persistence and deterministic source_id derivation in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/domain/source_identity.rs
   Title: Implement the deterministic seed contract.
   Purpose: Enforce one internal identity rule for new and migrated rows.
   Files/Areas: `crates/mod_memory/src/domain/source.rs`, `crates/mod_memory/src/domain/source_identity.rs`.
@@ -150,7 +150,7 @@
   Dependency: T009.
   Risk Closed: Deterministic source-id drift, future-version collision risk, migration and runtime mismatch.
 
-- [ ] T013 [P] [US1] Separate canonical external_id from provenance in crates/mod_memory/src/application/register_source.rs and crates/mod_memory/src/domain/source.rs
+- [X] T013 [P] [US1] Separate canonical external_id from provenance in crates/mod_memory/src/application/register_source.rs and crates/mod_memory/src/domain/source.rs
   Title: Enforce external_id role separation.
   Purpose: Make canonical `external_id` the authoritative persisted identity while keeping direct-standard raw IDs in provenance only.
   Files/Areas: `crates/mod_memory/src/application/register_source.rs`, `crates/mod_memory/src/domain/source.rs`.
@@ -158,7 +158,7 @@
   Dependency: T009, T010, T011, T012.
   Risk Closed: External-id role confusion, provenance overwrite, direct-standard passthrough risk.
 
-- [ ] T014 [P] [US2] Adopt semantic_payload_hash as the authoritative comparator in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/application/register_source.rs
+- [X] T014 [P] [US2] Adopt semantic_payload_hash as the authoritative comparator in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/application/register_source.rs
   Title: Adopt semantic_payload_hash across the domain model.
   Purpose: Replace legacy `canonical_payload_hash` semantics with the plan-approved replay or conflict comparator.
   Files/Areas: `crates/mod_memory/src/domain/source.rs`, `crates/mod_memory/src/application/register_source.rs`.
@@ -166,7 +166,7 @@
   Dependency: T009.
   Risk Closed: Replay comparator drift, vocabulary drift, contract and code mismatch.
 
-- [ ] T015 [P] [US2] Enforce raw_body_hash diagnostic-only policy in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/application/register_source.rs
+- [X] T015 [P] [US2] Enforce raw_body_hash diagnostic-only policy in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/application/register_source.rs
   Title: Restrict raw_body_hash to diagnostics and audit only.
   Purpose: Prevent raw-body hashes from becoming a hidden replay, conflict, or public-contract input.
   Files/Areas: `crates/mod_memory/src/domain/source.rs`, `crates/mod_memory/src/application/register_source.rs`.
@@ -174,7 +174,7 @@
   Dependency: T014.
   Risk Closed: False replay, false conflict, diagnostics leakage, high-cardinality metrics drift.
 
-- [ ] T016 [US1] Load the canonical registry from one governed source in crates/mod_memory/src/domain/source_external_id.rs and crates/mod_memory/src/application/register_source.rs
+- [X] T016 [US1] Load the canonical registry from one governed source in crates/mod_memory/src/domain/source_external_id.rs and crates/mod_memory/src/application/register_source.rs
   Title: Wire canonical vocabulary governance into runtime identity construction.
   Purpose: Stop family and version tokens, alias mapping, and direct-standard profile mapping from drifting across files.
   Files/Areas: `crates/mod_memory/src/domain/source_external_id.rs`, `crates/mod_memory/src/application/register_source.rs`.
@@ -182,7 +182,7 @@
   Dependency: T007, T009, T010, T011.
   Risk Closed: Runtime vocabulary drift, canonical token drift, alias persistence.
 
-- [ ] T017 [P] [US1] Implement fail-fast validation for manual and direct-standard identity inputs in crates/mod_memory/src/domain/source_external_id.rs, crates/mod_memory/src/application/register_source.rs, and crates/app_server/src/handlers/source_register.rs
+- [X] T017 [P] [US1] Implement fail-fast validation for manual and direct-standard identity inputs in crates/mod_memory/src/domain/source_external_id.rs, crates/mod_memory/src/application/register_source.rs, and crates/app_server/src/handlers/source_register.rs
   Title: Reject invalid canonical identity inputs before state creation.
   Purpose: Guarantee that invalid canonical/manual values or untrusted direct-standard mappings fail before any authoritative write or derived UUID is created.
   Files/Areas: `crates/mod_memory/src/domain/source_external_id.rs`, `crates/mod_memory/src/application/register_source.rs`, `crates/app_server/src/handlers/source_register.rs`.
@@ -192,7 +192,7 @@
 
 ### Workstream C. Handler, Application, Repository, and Contract Behavior
 
-- [ ] T018 [P] [US1] Update registration contract coverage in tests/contract/register_source_contract.rs, tests/contract/register_source_standard_validation_matrix.rs, and tests/contract/openapi_smoke.rs
+- [X] T018 [P] [US1] Update registration contract coverage in tests/contract/register_source_contract.rs, tests/contract/register_source_standard_validation_matrix.rs, and tests/contract/openapi_smoke.rs
   Title: Lock registration contracts to the canonical identity model.
   Purpose: Make contract tests fail on any reintroduction of raw payload ID passthrough, provenance drift, or public diagnostics leakage.
   Files/Areas: `tests/contract/register_source_contract.rs`, `tests/contract/register_source_standard_validation_matrix.rs`, `tests/contract/openapi_smoke.rs`.
@@ -200,7 +200,7 @@
   Dependency: T006, T013, T014, T015, T017.
   Risk Closed: Contract drift, registration behavior drift, public-response drift.
 
-- [ ] T019 [P] [US1] Update registration fixtures in tests/fixtures/register_source/canonical_success.json, tests/fixtures/register_source/standards/, and tests/fixtures/register_source/validation_matrix/
+- [X] T019 [P] [US1] Update registration fixtures in tests/fixtures/register_source/canonical_success.json, tests/fixtures/register_source/standards/, and tests/fixtures/register_source/validation_matrix/
   Title: Update registration fixtures for canonical URI and provenance separation.
   Purpose: Make every canonical/manual and direct-standard fixture embody the final external-id and provenance rules.
   Files/Areas: `tests/fixtures/register_source/canonical_success.json`, `tests/fixtures/register_source/standards/`, `tests/fixtures/register_source/validation_matrix/`.
@@ -208,7 +208,7 @@
   Dependency: T008, T017.
   Risk Closed: Fixture drift, replay and validation blind spots.
 
-- [ ] T020 [P] [US1] Remove direct-standard raw payload id passthrough in crates/app_server/src/handlers/source_register.rs and crates/mod_memory/src/application/register_source.rs
+- [X] T020 [P] [US1] Remove direct-standard raw payload id passthrough in crates/app_server/src/handlers/source_register.rs and crates/mod_memory/src/application/register_source.rs
   Title: Replace raw payload ID passthrough with canonical identity derivation.
   Purpose: Ensure direct-standard ingest never stores or returns a third-party raw `id` as authoritative `external_id`.
   Files/Areas: `crates/app_server/src/handlers/source_register.rs`, `crates/mod_memory/src/application/register_source.rs`.
@@ -216,7 +216,7 @@
   Dependency: T013, T016, T017, T019.
   Risk Closed: Direct-standard identity drift, raw ID passthrough, canonical contract violation.
 
-- [ ] T021 [P] [US1] Enforce manual canonical validation fail-fast in crates/app_server/src/handlers/source_register.rs and crates/mod_memory/src/domain/source_external_id.rs
+- [X] T021 [P] [US1] Enforce manual canonical validation fail-fast in crates/app_server/src/handlers/source_register.rs and crates/mod_memory/src/domain/source_external_id.rs
   Title: Fail fast on invalid caller-supplied canonical URIs.
   Purpose: Keep canonical/manual ingest from creating authoritative rows outside the project-owned namespace.
   Files/Areas: `crates/app_server/src/handlers/source_register.rs`, `crates/mod_memory/src/domain/source_external_id.rs`.
@@ -224,7 +224,7 @@
   Dependency: T017, T018.
   Risk Closed: Namespace escape, invalid-canonical acceptance, hidden partial state.
 
-- [ ] T022 [P] [US2] Replace replay or conflict behavior in crates/mod_memory/src/application/register_source.rs and crates/mod_memory/src/infra/surreal_source_repo.rs
+- [X] T022 [P] [US2] Replace replay or conflict behavior in crates/mod_memory/src/application/register_source.rs and crates/mod_memory/src/infra/surreal_source_repo.rs
   Title: Implement canonical replay and conflict decisions.
   Purpose: Make runtime replay semantics follow canonical URI plus semantic hash and nothing else.
   Files/Areas: `crates/mod_memory/src/application/register_source.rs`, `crates/mod_memory/src/infra/surreal_source_repo.rs`.
@@ -232,7 +232,7 @@
   Dependency: T014, T015, T018.
   Risk Closed: False replay, false conflict, repository and application mismatch.
 
-- [ ] T023 [P] [US3] Align registration response provenance in crates/app_server/src/handlers/source_register.rs and crates/mod_memory/src/application/register_source.rs
+- [X] T023 [P] [US3] Align registration response provenance in crates/app_server/src/handlers/source_register.rs and crates/mod_memory/src/application/register_source.rs
   Title: Return the public provenance envelope on registration.
   Purpose: Ensure registration exposes the same public provenance shape as retrieval.
   Files/Areas: `crates/app_server/src/handlers/source_register.rs`, `crates/mod_memory/src/application/register_source.rs`.
@@ -240,7 +240,7 @@
   Dependency: T006, T013, T014, T015, T020, T022.
   Risk Closed: Registration or retrieval provenance drift, public diagnostics leakage.
 
-- [ ] T024 [P] [US3] Align retrieval response provenance in crates/app_server/src/handlers/source_get.rs, crates/mod_memory/src/application/get_source.rs, and crates/mod_memory/src/infra/surreal_source_query.rs
+- [X] T024 [P] [US3] Align retrieval response provenance in crates/app_server/src/handlers/source_get.rs, crates/mod_memory/src/application/get_source.rs, and crates/mod_memory/src/infra/surreal_source_query.rs
   Title: Return the same public provenance envelope on retrieval.
   Purpose: Make retrieval reflect the exact authoritative provenance model already fixed for registration.
   Files/Areas: `crates/app_server/src/handlers/source_get.rs`, `crates/mod_memory/src/application/get_source.rs`, `crates/mod_memory/src/infra/surreal_source_query.rs`.
@@ -248,7 +248,7 @@
   Dependency: T006, T016, T023.
   Risk Closed: Retrieval contract drift, provenance inconsistency, remap response inconsistency.
 
-- [ ] T025 [P] [US2] Align repository lookup, upsert, and conflict semantics in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/mod_memory/src/infra/surreal_source_query.rs
+- [X] T025 [P] [US2] Align repository lookup, upsert, and conflict semantics in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/mod_memory/src/infra/surreal_source_query.rs
   Title: Make repository semantics canonical-aware.
   Purpose: Ensure storage lookups, upserts, and conflict checks match application-layer canonical identity behavior.
   Files/Areas: `crates/mod_memory/src/infra/surreal_source_repo.rs`, `crates/mod_memory/src/infra/surreal_source_query.rs`.
@@ -256,7 +256,7 @@
   Dependency: T012, T020, T022, T024.
   Risk Closed: Storage-layer drift, duplicate-row creation, hidden legacy fallback.
 
-- [ ] T026 [US1] Persist deterministic source_id governance in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/core_infra/src/surrealdb.rs
+- [X] T026 [US1] Persist deterministic source_id governance in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/core_infra/src/surrealdb.rs
   Title: Persist canonical rows with deterministic governed source_id values.
   Purpose: Make every new authoritative row conform to the final seed contract at persistence time.
   Files/Areas: `crates/mod_memory/src/infra/surreal_source_repo.rs`, `crates/core_infra/src/surrealdb.rs`.
@@ -266,7 +266,7 @@
 
 ### Workstream D. Mixed-Population Safety
 
-- [ ] T027 [P] [US4] Add old-row-only behavior coverage in tests/integration/get_source_flow.rs and tests/integration/memory_ingest_vertical_slice.rs
+- [X] T027 [P] [US4] Add old-row-only behavior coverage in tests/integration/get_source_flow.rs and tests/integration/memory_ingest_vertical_slice.rs
   Title: Prove old-row-only read behavior during the migration window.
   Purpose: Ensure legacy-only rows remain readable through the documented resolution path while writes stay denied.
   Files/Areas: `tests/integration/get_source_flow.rs`, `tests/integration/memory_ingest_vertical_slice.rs`.
@@ -274,7 +274,7 @@
   Dependency: T024, T025, T026.
   Risk Closed: Mixed-population blind spot, unexpected write acceptance, legacy-read regression.
 
-- [ ] T028 [P] [US4] Add new-row-only behavior coverage in tests/integration/register_source_flow.rs and tests/integration/get_source_flow.rs
+- [X] T028 [P] [US4] Add new-row-only behavior coverage in tests/integration/register_source_flow.rs and tests/integration/get_source_flow.rs
   Title: Prove new-row-only behavior after cutover.
   Purpose: Verify steady state contains only canonical rows with deterministic `source_id` and normal replay or conflict semantics.
   Files/Areas: `tests/integration/register_source_flow.rs`, `tests/integration/get_source_flow.rs`.
@@ -282,7 +282,7 @@
   Dependency: T022, T023, T024, T026.
   Risk Closed: Steady-state drift, accidental legacy-path retention.
 
-- [ ] T029 [P] [US4] Add old-and-new coexistence behavior coverage in tests/integration/multi_instance_consistency.rs and tests/integration/get_source_flow.rs
+- [X] T029 [P] [US4] Add old-and-new coexistence behavior coverage in tests/integration/multi_instance_consistency.rs and tests/integration/get_source_flow.rs
   Title: Prove coexistence remains a transient read-only migration state.
   Purpose: Verify old plus new rows can coexist only during the migration window and that reads prefer the rewritten authoritative row.
   Files/Areas: `tests/integration/multi_instance_consistency.rs`, `tests/integration/get_source_flow.rs`.
@@ -290,7 +290,7 @@
   Dependency: T027, T028.
   Risk Closed: False replay across old and new rows, false conflict across old and new rows, steady-state coexistence risk.
 
-- [ ] T030 [P] [US4] Implement remap lookup behavior in crates/mod_memory/src/infra/surreal_source_query.rs, crates/mod_memory/src/application/get_source.rs, and crates/app_server/src/handlers/source_get.rs
+- [X] T030 [P] [US4] Implement remap lookup behavior in crates/mod_memory/src/infra/surreal_source_query.rs, crates/mod_memory/src/application/get_source.rs, and crates/app_server/src/handlers/source_get.rs
   Title: Implement deterministic remap lookup during migration.
   Purpose: Resolve legacy `source_id` reads safely to the canonical target row throughout the migration window.
   Files/Areas: `crates/mod_memory/src/infra/surreal_source_query.rs`, `crates/mod_memory/src/application/get_source.rs`, `crates/app_server/src/handlers/source_get.rs`.
@@ -298,7 +298,7 @@
   Dependency: T024, T025, T026.
   Risk Closed: Broken reads during migration, ambiguous lookup behavior, stale remap exposure after cutover.
 
-- [ ] T031 [P] [US4] Enforce write deny behavior during the migration window in crates/app_server/src/state.rs, crates/app_server/src/middleware.rs, and crates/app_server/src/handlers/source_register.rs
+- [X] T031 [P] [US4] Enforce write deny behavior during the migration window in crates/app_server/src/state.rs, crates/app_server/src/middleware.rs, and crates/app_server/src/handlers/source_register.rs
   Title: Deny registration writes during rewrite and verification phases.
   Purpose: Eliminate live-write races while legacy and canonical rows coexist.
   Files/Areas: `crates/app_server/src/state.rs`, `crates/app_server/src/middleware.rs`, `crates/app_server/src/handlers/source_register.rs`.
@@ -306,7 +306,7 @@
   Dependency: T018, T027, T030.
   Risk Closed: Mixed-population race condition, partial migration corruption, untracked maintenance-window writes.
 
-- [ ] T032 [US4] Handle duplicate canonical identity candidates in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/core_infra/src/surrealdb.rs
+- [X] T032 [US4] Handle duplicate canonical identity candidates in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/core_infra/src/surrealdb.rs
   Title: Enforce consolidate-versus-abort handling for duplicate canonical candidates.
   Purpose: Prevent false replay and false conflict during migration classification and coexistence reads.
   Files/Areas: `crates/mod_memory/src/infra/surreal_source_repo.rs`, `crates/core_infra/src/surrealdb.rs`.
@@ -316,7 +316,7 @@
 
 ### Workstream E. Migration Execution and Verification
 
-- [ ] T033 [P] [US4] Implement migratable, consolidate, and unmigratable classification in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/core_infra/src/surrealdb.rs
+- [X] T033 [P] [US4] Implement migratable, consolidate, and unmigratable classification in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/core_infra/src/surrealdb.rs
   Title: Implement the closed migration classification model.
   Purpose: Classify every legacy row under one of the three allowed outcomes with no residual ambiguous state.
   Files/Areas: `crates/mod_memory/src/infra/surreal_source_repo.rs`, `crates/core_infra/src/surrealdb.rs`.
@@ -324,7 +324,7 @@
   Dependency: T012, T014, T025, T032.
   Risk Closed: Legacy-row migration classification execution gap, ambiguous cutover readiness, divergent runtime and migration rules.
 
-- [ ] T034 [P] [US4] Implement dry-run JSON output in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/core_infra/src/surrealdb.rs
+- [X] T034 [P] [US4] Implement dry-run JSON output in crates/mod_memory/src/infra/surreal_source_repo.rs and crates/core_infra/src/surrealdb.rs
   Title: Emit the fixed machine-readable dry-run report.
   Purpose: Give operators and reviewers one authoritative artifact for pass or fail classification before rewrite execution starts.
   Files/Areas: `crates/mod_memory/src/infra/surreal_source_repo.rs`, `crates/core_infra/src/surrealdb.rs`.
@@ -332,7 +332,7 @@
   Dependency: T033.
   Risk Closed: Dry-run contract drift, operator interpretation risk, migration-audit gap.
 
-- [ ] T035 [P] [US4] Validate source_id rewrite and dependent-reference rewrite in crates/mod_memory/src/infra/surreal_source_repo.rs, crates/mod_memory/src/infra/surreal_memory_repo.rs, and crates/core_infra/src/surrealdb.rs
+- [X] T035 [P] [US4] Validate source_id rewrite and dependent-reference rewrite in crates/mod_memory/src/infra/surreal_source_repo.rs, crates/mod_memory/src/infra/surreal_memory_repo.rs, and crates/core_infra/src/surrealdb.rs
   Title: Rewrite source rows and dependent references safely.
   Purpose: Move authoritative rows and every dependent reference to deterministic `source_id` values without leaving missing or split references behind.
   Files/Areas: `crates/mod_memory/src/infra/surreal_source_repo.rs`, `crates/mod_memory/src/infra/surreal_memory_repo.rs`, `crates/core_infra/src/surrealdb.rs`.
@@ -340,7 +340,7 @@
   Dependency: T033, T034.
   Risk Closed: Dependent-reference rewrite gap, partial rewrite corruption, legacy alias retention.
 
-- [ ] T036 [P] [US4] Implement rewrite completeness threshold verification in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/infra/surreal_source_query.rs
+- [X] T036 [P] [US4] Implement rewrite completeness threshold verification in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/infra/surreal_source_query.rs
   Title: Verify 100 percent rewrite completeness before cutover.
   Purpose: Enforce the rollout rule that no authoritative legacy row, alias field, or dangling reference remains.
   Files/Areas: `crates/core_infra/src/surrealdb.rs`, `crates/mod_memory/src/infra/surreal_source_query.rs`.
@@ -348,7 +348,7 @@
   Dependency: T035.
   Risk Closed: Verification-gap risk, hidden partial migration, false cutover readiness.
 
-- [ ] T037 [P] [US4] Enforce stop conditions in crates/core_infra/src/surrealdb.rs, crates/app_server/src/middleware.rs, and crates/app_server/src/state.rs
+- [X] T037 [P] [US4] Enforce stop conditions in crates/core_infra/src/surrealdb.rs, crates/app_server/src/middleware.rs, and crates/app_server/src/state.rs
   Title: Stop execution on every rollout-blocking condition.
   Purpose: Make the closed stop-condition list executable rather than documentary.
   Files/Areas: `crates/core_infra/src/surrealdb.rs`, `crates/app_server/src/middleware.rs`, `crates/app_server/src/state.rs`.
@@ -356,7 +356,7 @@
   Dependency: T031, T033, T034, T035, T036.
   Risk Closed: Silent rollout failure, unsafe cutover continuation, undocumented abort handling.
 
-- [ ] T038 [US4] Document rollback posture and operator pass or fail checks in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/checklists/requirements.md
+- [X] T038 [US4] Document rollback posture and operator pass or fail checks in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/checklists/requirements.md
   Title: Document restore-only rollback and operator sign-off rules.
   Purpose: Make rollback and sign-off criteria explicit at the same granularity as the migration implementation.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`, `specs/002-canonical-source-external-id/checklists/requirements.md`.
@@ -366,7 +366,7 @@
 
 ### Workstream F. Observability and Diagnostics
 
-- [ ] T039 [P] [US3] Add observability assertions for registration and retrieval in tests/integration/observability_tracing_flow.rs and tests/integration/observability_metrics.rs
+- [X] T039 [P] [US3] Add observability assertions for registration and retrieval in tests/integration/observability_tracing_flow.rs and tests/integration/observability_metrics.rs
   Title: Prove canonical identity context is observable end to end.
   Purpose: Make observability a tested requirement rather than a logging afterthought.
   Files/Areas: `tests/integration/observability_tracing_flow.rs`, `tests/integration/observability_metrics.rs`.
@@ -374,7 +374,7 @@
   Dependency: T023, T024, T031, T037.
   Risk Closed: Observability gap, unbounded metrics risk, missing traceability.
 
-- [ ] T040 [P] [US3] Wire structured log fields in crates/app_server/src/handlers/source_register.rs, crates/app_server/src/handlers/source_get.rs, and crates/mod_memory/src/application/register_source.rs
+- [X] T040 [P] [US3] Wire structured log fields in crates/app_server/src/handlers/source_register.rs, crates/app_server/src/handlers/source_get.rs, and crates/mod_memory/src/application/register_source.rs
   Title: Emit the required structured log fields.
   Purpose: Capture canonicalization, replay, conflict, and provenance outcomes with the mandatory fields and no ad hoc field naming drift.
   Files/Areas: `crates/app_server/src/handlers/source_register.rs`, `crates/app_server/src/handlers/source_get.rs`, `crates/mod_memory/src/application/register_source.rs`.
@@ -382,7 +382,7 @@
   Dependency: T023, T024, T030, T031, T037.
   Risk Closed: Missing structured fields, log taxonomy drift, operator investigation gaps.
 
-- [ ] T041 [P] [US4] Wire trace correlation fields in crates/app_server/src/middleware.rs, crates/app_server/src/router.rs, and crates/core_infra/src/surrealdb.rs
+- [X] T041 [P] [US4] Wire trace correlation fields in crates/app_server/src/middleware.rs, crates/app_server/src/router.rs, and crates/core_infra/src/surrealdb.rs
   Title: Propagate trace and request correlation through online and offline flows.
   Purpose: Keep online handlers and offline migration execution in the same correlation model.
   Files/Areas: `crates/app_server/src/middleware.rs`, `crates/app_server/src/router.rs`, `crates/core_infra/src/surrealdb.rs`.
@@ -390,7 +390,7 @@
   Dependency: T039.
   Risk Closed: Broken trace correlation, disconnected offline diagnostics, request-correlation drift.
 
-- [ ] T042 [P] [US4] Wire bounded-cardinality metrics expectations in crates/app_server/src/middleware.rs and tests/integration/observability_metrics.rs
+- [X] T042 [P] [US4] Wire bounded-cardinality metrics expectations in crates/app_server/src/middleware.rs and tests/integration/observability_metrics.rs
   Title: Enforce bounded metrics for canonicalization and migration decisions.
   Purpose: Prevent canonical identifiers and hashes from leaking into metrics labels while still exposing actionable operator counters.
   Files/Areas: `crates/app_server/src/middleware.rs`, `tests/integration/observability_metrics.rs`.
@@ -398,7 +398,7 @@
   Dependency: T039.
   Risk Closed: High-cardinality metrics risk, observability cost blow-up, policy drift.
 
-- [ ] T043 [US4] Wire the decision_reason taxonomy in crates/mod_memory/src/application/register_source.rs, crates/mod_memory/src/infra/surreal_source_repo.rs, and crates/core_infra/src/surrealdb.rs
+- [X] T043 [US4] Wire the decision_reason taxonomy in crates/mod_memory/src/application/register_source.rs, crates/mod_memory/src/infra/surreal_source_repo.rs, and crates/core_infra/src/surrealdb.rs
   Title: Make decision_reason taxonomy authoritative in code.
   Purpose: Ensure every validation, replay, conflict, migration, and remap branch emits one closed taxonomy value.
   Files/Areas: `crates/mod_memory/src/application/register_source.rs`, `crates/mod_memory/src/infra/surreal_source_repo.rs`, `crates/core_infra/src/surrealdb.rs`.
@@ -406,7 +406,7 @@
   Dependency: T022, T030, T033, T037, T040, T041, T042.
   Risk Closed: Taxonomy drift, unsearchable diagnostics, inconsistent operator reasoning.
 
-- [ ] T044 [US4] Document public versus internal diagnostics boundaries in specs/002-canonical-source-external-id/quickstart.md, specs/002-canonical-source-external-id/research.md, and README.md
+- [X] T044 [US4] Document public versus internal diagnostics boundaries in specs/002-canonical-source-external-id/quickstart.md, specs/002-canonical-source-external-id/research.md, and README.md
   Title: Document diagnostics boundaries for operators and reviewers.
   Purpose: Make it explicit which fields belong in API contracts versus internal logs, traces, and metrics.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`, `specs/002-canonical-source-external-id/research.md`, `README.md`.
@@ -416,7 +416,7 @@
 
 ### Workstream G. Regression-Hardening Tests
 
-- [ ] T045 [P] [US1] Add the object_id collision matrix in tests/unit/normalization_edges.rs and tests/fixtures/register_source/replay_hashing/
+- [X] T045 [P] [US1] Add the object_id collision matrix in tests/unit/normalization_edges.rs and tests/fixtures/register_source/replay_hashing/
   Title: Freeze object-id collision behavior.
   Purpose: Prove that normalization does not collapse distinct producer identifiers.
   Files/Areas: `tests/unit/normalization_edges.rs`, `tests/fixtures/register_source/replay_hashing/`.
@@ -424,7 +424,7 @@
   Dependency: T011, T019.
   Risk Closed: Object-id normalization regression, false equivalence, canonical URI instability.
 
-- [ ] T046 [P] [US1] Add the source_domain edge matrix in tests/unit/normalization_edges.rs and tests/fixtures/register_source/validation_matrix/
+- [X] T046 [P] [US1] Add the source_domain edge matrix in tests/unit/normalization_edges.rs and tests/fixtures/register_source/validation_matrix/
   Title: Freeze source-domain edge behavior.
   Purpose: Prove the governed domain-normalization pipeline accepts and rejects exactly the intended inputs.
   Files/Areas: `tests/unit/normalization_edges.rs`, `tests/fixtures/register_source/validation_matrix/`.
@@ -432,7 +432,7 @@
   Dependency: T010, T019.
   Risk Closed: Domain normalization regression, unsafe authority acceptance, false source-domain equivalence.
 
-- [ ] T047 [P] [US1] Add canonical URI golden-output and alias non-leakage tests in tests/unit/normalization_edges.rs and tests/contract/openapi_smoke.rs
+- [X] T047 [P] [US1] Add canonical URI golden-output and alias non-leakage tests in tests/unit/normalization_edges.rs and tests/contract/openapi_smoke.rs
   Title: Freeze canonical URI output stability.
   Purpose: Ensure canonical URI examples, namespace shape, and alias handling stay stable across code and contract changes.
   Files/Areas: `tests/unit/normalization_edges.rs`, `tests/contract/openapi_smoke.rs`.
@@ -440,7 +440,7 @@
   Dependency: T006, T007, T010, T011, T016.
   Risk Closed: Namespace drift, alias leakage, OpenAPI-example regression.
 
-- [ ] T048 [P] [US2] Add replay and conflict regression coverage in tests/integration/register_source_replay_hashing.rs and tests/contract/register_source_standard_errors.rs
+- [X] T048 [P] [US2] Add replay and conflict regression coverage in tests/integration/register_source_replay_hashing.rs and tests/contract/register_source_standard_errors.rs
   Title: Freeze canonical replay and conflict behavior.
   Purpose: Make the closed replay or conflict rules executable across canonical/manual and direct-standard inputs.
   Files/Areas: `tests/integration/register_source_replay_hashing.rs`, `tests/contract/register_source_standard_errors.rs`.
@@ -448,7 +448,7 @@
   Dependency: T022, T029, T032.
   Risk Closed: Replay regression, conflict regression, coexistence false positives.
 
-- [ ] T049 [P] [US4] Add migration regression coverage in tests/contract/surreal_source_store_contract.rs, tests/integration/indexing_status_mapping_flow.rs, and tests/integration/multi_instance_consistency.rs
+- [X] T049 [P] [US4] Add migration regression coverage in tests/contract/surreal_source_store_contract.rs, tests/integration/indexing_status_mapping_flow.rs, and tests/integration/multi_instance_consistency.rs
   Title: Freeze migration classification and rewrite safety.
   Purpose: Make dry-run, rewrite, partial migration, and verification behavior fail loudly on any rollout-risk regression.
   Files/Areas: `tests/contract/surreal_source_store_contract.rs`, `tests/integration/indexing_status_mapping_flow.rs`, `tests/integration/multi_instance_consistency.rs`.
@@ -456,7 +456,7 @@
   Dependency: T033, T034, T035, T036, T037.
   Risk Closed: Migration regression, rewrite safety regression, verification-path regression.
 
-- [ ] T050 [P] [US4] Add observability regression assertions in tests/integration/observability_tracing_flow.rs and tests/integration/observability_metrics.rs
+- [X] T050 [P] [US4] Add observability regression assertions in tests/integration/observability_tracing_flow.rs and tests/integration/observability_metrics.rs
   Title: Freeze required diagnostics field presence.
   Purpose: Guarantee that rollout-critical diagnostics remain present for runtime and migration investigation.
   Files/Areas: `tests/integration/observability_tracing_flow.rs`, `tests/integration/observability_metrics.rs`.
@@ -466,7 +466,7 @@
 
 ### Workstream H. Rollout Runbook and Operator Readiness
 
-- [ ] T051 [P] Rewrite the pre-migration checklist in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/checklists/requirements.md
+- [X] T051 [P] Rewrite the pre-migration checklist in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/checklists/requirements.md
   Title: Publish the pre-migration operator gate list.
   Purpose: Make every rollout prerequisite reviewer-checkable before dry-run execution begins.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`, `specs/002-canonical-source-external-id/checklists/requirements.md`.
@@ -474,7 +474,7 @@
   Dependency: T005, T038.
   Risk Closed: Missing backup gate, incomplete preflight, operator-readiness gap.
 
-- [ ] T052 [P] Write dry-run instructions and interpretation guidance in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/research.md
+- [X] T052 [P] Write dry-run instructions and interpretation guidance in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/research.md
   Title: Publish dry-run execution and report interpretation guidance.
   Purpose: Make the dry-run JSON artifact actionable for operators and reviewers.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`, `specs/002-canonical-source-external-id/research.md`.
@@ -482,7 +482,7 @@
   Dependency: T034, T051.
   Risk Closed: Dry-run interpretation drift, operator inconsistency, sign-off ambiguity.
 
-- [ ] T053 [P] Document verification query procedure and rewrite-completeness thresholds in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/checklists/requirements.md
+- [X] T053 [P] Document verification query procedure and rewrite-completeness thresholds in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/checklists/requirements.md
   Title: Publish verification queries and 100 percent completeness gates.
   Purpose: Make cutover readiness depend on concrete verifications rather than general confidence.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`, `specs/002-canonical-source-external-id/checklists/requirements.md`.
@@ -490,7 +490,7 @@
   Dependency: T036, T051, T052.
   Risk Closed: Rollout verification gap, partial rewrite acceptance, unverifiable cutover readiness.
 
-- [ ] T054 [P] Document stop conditions and rollback posture in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/checklists/requirements.md
+- [X] T054 [P] Document stop conditions and rollback posture in specs/002-canonical-source-external-id/quickstart.md and specs/002-canonical-source-external-id/checklists/requirements.md
   Title: Publish rollout stop and rollback rules.
   Purpose: Make every abort trigger and the restore-only rollback posture explicit before execution.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`, `specs/002-canonical-source-external-id/checklists/requirements.md`.
@@ -498,7 +498,7 @@
   Dependency: T037, T038, T051.
   Risk Closed: Unsafe cutover continuation, rollback confusion, incomplete abort handling.
 
-- [ ] T055 [P] Publish final sign-off and post-cutover validation in specs/002-canonical-source-external-id/quickstart.md, specs/002-canonical-source-external-id/checklists/requirements.md, and README.md
+- [X] T055 [P] Publish final sign-off and post-cutover validation in specs/002-canonical-source-external-id/quickstart.md, specs/002-canonical-source-external-id/checklists/requirements.md, and README.md
   Title: Publish final sign-off and post-cutover validation steps.
   Purpose: Separate final approval from implementation completion so rollout-critical checks do not get buried.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`, `specs/002-canonical-source-external-id/checklists/requirements.md`, `README.md`.
@@ -506,7 +506,7 @@
   Dependency: T044, T050, T051, T052, T053, T054.
   Risk Closed: Rollout-critical work buried in general documentation, incomplete final verification, weak operator handoff.
 
-- [ ] T056 Run post-implementation validation commands from specs/002-canonical-source-external-id/quickstart.md and repository test targets
+- [X] T056 Run post-implementation validation commands from specs/002-canonical-source-external-id/quickstart.md and repository test targets
   Title: Execute the documented rollout validation suite.
   Purpose: Confirm that contract, integration, migration, observability, SLO, and bench gates all pass under the documented rollout model.
   Files/Areas: `specs/002-canonical-source-external-id/quickstart.md`, `tests/`, `benches/`.

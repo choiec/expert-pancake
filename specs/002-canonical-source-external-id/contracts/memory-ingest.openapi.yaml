@@ -60,8 +60,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '408':
+          description: Normalization timeout.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: Canonical external id already exists with a semantically different payload.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Payload too large.
           headers:
             X-Request-Id:
               $ref: '#/components/headers/RequestIdHeader'
@@ -108,6 +126,147 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Authoritative storage unavailable.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /memory-items/{urn}:
+    get:
+      summary: Retrieve a memory item by URN.
+      operationId: getMemoryItem
+      parameters:
+        - name: urn
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Memory item found.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemoryItemResponse'
+        '404':
+          description: Memory item not found.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Authoritative storage unavailable.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /search/memory-items:
+    get:
+      summary: Search memory-item projections.
+      description: Returns Meilisearch projection hits only. Authoritative content remains available through GET /memory-items/{urn} and GET /sources/{source-id}.
+      operationId: searchMemoryItems
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: source-id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: document-type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [text, markdown, json]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Search results.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '503':
+          description: Search unavailable.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /health:
+    get:
+      summary: Local-only liveness probe.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is alive.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /ready:
+    get:
+      summary: Dependency-aware readiness probe for the write path.
+      operationId: getReady
+      responses:
+        '200':
+          description: Authoritative write path is ready.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Authoritative write path is unavailable.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
 components:
   headers:
     RequestIdHeader:
@@ -194,6 +353,9 @@ components:
           description: Original standard payload identifier preserved as provenance only.
         name:
           type: string
+        issuer:
+          type: object
+          additionalProperties: true
       additionalProperties: true
     RegisterSourceResponse:
       type: object
@@ -218,8 +380,7 @@ components:
           type: string
           enum: [text, markdown, json]
         indexing_status:
-          type: string
-          enum: [queued, indexed, deferred]
+          $ref: '#/components/schemas/IndexingStatus'
         source_metadata:
           $ref: '#/components/schemas/SourceMetadataEnvelope'
         memory_items:
@@ -239,7 +400,7 @@ components:
           type: integer
           minimum: 0
         unit_type:
-          type: string
+          $ref: '#/components/schemas/MemoryUnitType'
     SourceResponse:
       type: object
       required:
@@ -263,13 +424,114 @@ components:
         document_type:
           type: string
           enum: [text, markdown, json]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        indexing_status:
+          $ref: '#/components/schemas/IndexingStatus'
         source_metadata:
           $ref: '#/components/schemas/SourceMetadataEnvelope'
         memory_items:
           type: array
           items:
-            type: object
-            additionalProperties: true
+            $ref: '#/components/schemas/MemoryItemResponse'
+    MemoryItemResponse:
+      type: object
+      required:
+        - urn
+        - source_id
+        - sequence
+        - content
+        - item_metadata
+        - created_at
+      properties:
+        urn:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+          minimum: 0
+        content:
+          type: string
+        item_metadata:
+          type: object
+          required:
+            - unit_type
+            - start_offset
+            - end_offset
+            - version
+          properties:
+            unit_type:
+              $ref: '#/components/schemas/MemoryUnitType'
+            start_offset:
+              type: integer
+              minimum: 0
+            end_offset:
+              type: integer
+              minimum: 0
+            version:
+              type: string
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        source_metadata:
+          type: object
+          additionalProperties: true
+    SearchResponse:
+      type: object
+      required:
+        - total
+        - limit
+        - offset
+        - items
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'
+    SearchHit:
+      type: object
+      required:
+        - urn
+        - source_id
+        - sequence
+        - document_type
+        - content_preview
+      properties:
+        urn:
+          type: string
+        source_id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+          minimum: 0
+        document_type:
+          type: string
+          enum: [text, markdown, json]
+        content_preview:
+          type: string
+        score:
+          type: number
+          format: float
     SourceMetadataEnvelope:
       type: object
       required:
@@ -300,16 +562,75 @@ components:
         semantic_payload_hash:
           type: string
           description: Authoritative replay and conflict comparator.
+    IndexingStatus:
+      type: string
+      enum: [queued, indexed, deferred]
+    MemoryUnitType:
+      type: string
+      enum: [paragraph, section, json_document, metadata_placeholder]
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - components
+      properties:
+        status:
+          type: string
+          enum: [ready]
+        components:
+          type: object
+          required:
+            - service
+          properties:
+            service:
+              $ref: '#/components/schemas/ComponentStatus'
+    ReadinessResponse:
+      type: object
+      required:
+        - status
+        - components
+      properties:
+        status:
+          type: string
+          enum: [ready, degraded, down]
+        components:
+          type: object
+          required:
+            - service
+            - database
+            - search
+          properties:
+            service:
+              $ref: '#/components/schemas/ComponentStatus'
+            database:
+              $ref: '#/components/schemas/ComponentStatus'
+            search:
+              $ref: '#/components/schemas/ComponentStatus'
+    ComponentStatus:
+      type: string
+      enum: [ready, degraded, down]
     ErrorResponse:
       type: object
       required:
         - error_code
         - message
+        - timestamp
         - request_id
       properties:
         error_code:
           type: string
         message:
           type: string
+        details:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
+        timestamp:
+          type: string
+          format: date-time
         request_id:
           type: string

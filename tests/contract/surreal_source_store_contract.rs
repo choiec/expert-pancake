@@ -48,13 +48,15 @@ async fn identical_external_id_and_hash_replay_existing_authoritative_identifier
 
     let first = service
         .execute(RegisterSourceCommand {
-            external_id: "source-001".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:source-001".to_owned(),
             title: "Rust Notes".to_owned(),
             summary: Some("source replay contract".to_owned()),
             document_type: DocumentType::Text,
             authoritative_content: "alpha\n\n beta".to_owned(),
             source_metadata: serde_json::json!({"topic": "rust"}),
-            canonical_payload_hash: "hash-001".to_owned(),
+            semantic_payload_hash: "hash-001".to_owned(),
+            original_standard_id: None,
+            raw_body_hash: None,
             ingest_kind: IngestKind::Canonical,
         })
         .await
@@ -62,13 +64,15 @@ async fn identical_external_id_and_hash_replay_existing_authoritative_identifier
 
     let replay = service
         .execute(RegisterSourceCommand {
-            external_id: "source-001".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:source-001".to_owned(),
             title: "Rust Notes".to_owned(),
             summary: Some("source replay contract".to_owned()),
             document_type: DocumentType::Text,
             authoritative_content: "alpha\n\n beta".to_owned(),
             source_metadata: serde_json::json!({"topic": "rust"}),
-            canonical_payload_hash: "hash-001".to_owned(),
+            semantic_payload_hash: "hash-001".to_owned(),
+            original_standard_id: None,
+            raw_body_hash: None,
             ingest_kind: IngestKind::Canonical,
         })
         .await
@@ -86,13 +90,15 @@ async fn conflicting_payload_hash_for_same_external_id_returns_conflict() {
 
     service
         .execute(RegisterSourceCommand {
-            external_id: "source-002".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:source-002".to_owned(),
             title: "Rust Notes".to_owned(),
             summary: None,
             document_type: DocumentType::Text,
             authoritative_content: "alpha".to_owned(),
             source_metadata: serde_json::json!({}),
-            canonical_payload_hash: "hash-a".to_owned(),
+            semantic_payload_hash: "hash-a".to_owned(),
+            original_standard_id: None,
+            raw_body_hash: None,
             ingest_kind: IngestKind::Canonical,
         })
         .await
@@ -100,13 +106,15 @@ async fn conflicting_payload_hash_for_same_external_id_returns_conflict() {
 
     let error = service
         .execute(RegisterSourceCommand {
-            external_id: "source-002".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:source-002".to_owned(),
             title: "Rust Notes".to_owned(),
             summary: None,
             document_type: DocumentType::Text,
             authoritative_content: "beta".to_owned(),
             source_metadata: serde_json::json!({}),
-            canonical_payload_hash: "hash-b".to_owned(),
+            semantic_payload_hash: "hash-b".to_owned(),
+            original_standard_id: None,
+            raw_body_hash: None,
             ingest_kind: IngestKind::Canonical,
         })
         .await

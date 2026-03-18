@@ -45,7 +45,7 @@ async fn processing_internal_status_still_surfaces_as_public_queued() {
         "/sources/register",
         json!({
             "title": "Processing status",
-            "external-id": "status-map-processing-001",
+            "external-id": "https://api.cherry-pick.net/cc/v1p3/example.edu:status-map-processing-001",
             "document-type": "text",
             "content": "processing status content"
         }),
@@ -97,13 +97,15 @@ async fn public_indexing_status_maps_from_queued_to_indexed() {
 
     let result = register
         .execute(RegisterSourceCommand {
-            external_id: "status-map-001".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:status-map-001".to_owned(),
             title: "Status map".to_owned(),
             summary: None,
             document_type: DocumentType::Text,
             authoritative_content: "hello status".to_owned(),
             source_metadata: serde_json::json!({}),
-            canonical_payload_hash: "status-hash-001".to_owned(),
+            semantic_payload_hash: "status-hash-001".to_owned(),
+            original_standard_id: None,
+            raw_body_hash: None,
             ingest_kind: IngestKind::Canonical,
         })
         .await
@@ -171,13 +173,15 @@ async fn dead_letter_maps_to_deferred_without_exposing_internal_state() {
 
     let result = register
         .execute(RegisterSourceCommand {
-            external_id: "status-map-dead-letter-001".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:status-map-dead-letter-001".to_owned(),
             title: "Dead letter".to_owned(),
             summary: None,
             document_type: DocumentType::Text,
             authoritative_content: "dead letter content".to_owned(),
             source_metadata: serde_json::json!({}),
-            canonical_payload_hash: "status-hash-dead-letter-001".to_owned(),
+            semantic_payload_hash: "status-hash-dead-letter-001".to_owned(),
+            original_standard_id: None,
+            raw_body_hash: None,
             ingest_kind: IngestKind::Canonical,
         })
         .await

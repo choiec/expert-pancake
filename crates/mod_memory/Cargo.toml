@@ -8,6 +8,7 @@ async-trait = "0.1.89"
 core_infra = { path = "../core_infra" }
 core_shared = { path = "../core_shared" }
 hex = "0.4.3"
+idna = "1.0.3"
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -15,4 +16,5 @@ meilisearch-sdk = { workspace = true }
 time = { version = "0.3.44", features = ["serde"] }
 tokio = { workspace = true }
 tracing = { workspace = true }
+url = "2.5.4"
 uuid = { workspace = true }

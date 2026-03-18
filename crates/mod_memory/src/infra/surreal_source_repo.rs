@@ -55,17 +55,19 @@ impl SourceRepository for SurrealSourceRepository {
             let existing_hash = existing
                 .source
                 .source_metadata
-                .pointer("/system/canonical_payload_hash")
+                .pointer("/system/semantic_payload_hash")
                 .and_then(Value::as_str)
                 .unwrap_or_default();
-            if existing_hash == source.canonical_payload_hash() {
+            if existing_hash == source.semantic_payload_hash() {
                 return Ok(SourceCreateOrReplay::Replay(bundle_from_records(
                     existing,
                     self.db.search_available(),
+                    "steady_state",
+                    "canonical_only",
                 )?));
             }
             return Err(AppError::conflict(format!(
-                "external_id '{}' is already registered with a different canonical payload",
+                "external_id '{}' is already registered with a different semantic payload",
                 source.external_id
             )));
         }
@@ -82,17 +84,19 @@ impl SourceRepository for RuntimeSurrealSourceRepository {
             let existing_hash = existing
                 .source
                 .source_metadata
-                .pointer("/system/canonical_payload_hash")
+                .pointer("/system/semantic_payload_hash")
                 .and_then(Value::as_str)
                 .unwrap_or_default();
-            if existing_hash == source.canonical_payload_hash() {
+            if existing_hash == source.semantic_payload_hash() {
                 return Ok(SourceCreateOrReplay::Replay(bundle_from_records(
                     existing,
                     self.search_available(),
+                    "steady_state",
+                    "canonical_only",
                 )?));
             }
             return Err(AppError::conflict(format!(
-                "external_id '{}' is already registered with a different canonical payload",
+                "external_id '{}' is already registered with a different semantic payload",
                 source.external_id
             )));
         }
@@ -145,6 +149,8 @@ pub(crate) async fn fetch_memory_item_with_source(
 pub(crate) fn bundle_from_records(
     bundle: PersistedSourceBundle,
     search_available: bool,
+    migration_phase: &str,
+    legacy_resolution_path: &str,
 ) -> AppResult<SourceBundle> {
     let indexing_status = derive_public_indexing_status(
         bundle
@@ -161,6 +167,8 @@ pub(crate) fn bundle_from_records(
             .map(memory_item_from_record)
             .collect::<AppResult<Vec<_>>>()?,
         indexing_status,
+        migration_phase: migration_phase.to_owned(),
+        legacy_resolution_path: legacy_resolution_path.to_owned(),
     })
 }
 

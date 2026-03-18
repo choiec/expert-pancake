@@ -20,7 +20,7 @@ async fn standard_validation_matrix_covers_accept_reject_paths() {
     let cases = [
         Case {
             fixture: "register_source/validation_matrix/open_badges_accepted.json",
-            external_id: "urn:example:badge:matrix-accepted",
+            external_id: "https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Aexample%3Abadge%3Amatrix-accepted",
             expected_status: StatusCode::CREATED,
             expected_error_code: None,
         },
@@ -28,7 +28,7 @@ async fn standard_validation_matrix_covers_accept_reject_paths() {
             fixture: "register_source/validation_matrix/open_badges_schema_invalid.json",
             external_id: "urn:example:badge:matrix-invalid",
             expected_status: StatusCode::BAD_REQUEST,
-            expected_error_code: Some("INVALID_INPUT"),
+            expected_error_code: Some("DIRECT_STANDARD_REJECTED_UNTRUSTED_DOMAIN"),
         },
         Case {
             fixture: "register_source/validation_matrix/open_badges_unmappable.json",
@@ -38,7 +38,7 @@ async fn standard_validation_matrix_covers_accept_reject_paths() {
         },
         Case {
             fixture: "register_source/validation_matrix/clr_accepted.json",
-            external_id: "https://clr.example/credentials/matrix-accepted",
+            external_id: "https://api.cherry-pick.net/clr/v2p0/issuer.example.org:https%3A%2F%2Fclr.example%2Fcredentials%2Fmatrix-accepted",
             expected_status: StatusCode::CREATED,
             expected_error_code: None,
         },
@@ -46,7 +46,7 @@ async fn standard_validation_matrix_covers_accept_reject_paths() {
             fixture: "register_source/validation_matrix/clr_schema_invalid.json",
             external_id: "https://clr.example/credentials/matrix-invalid",
             expected_status: StatusCode::BAD_REQUEST,
-            expected_error_code: Some("INVALID_INPUT"),
+            expected_error_code: Some("DIRECT_STANDARD_REJECTED_UNTRUSTED_DOMAIN"),
         },
         Case {
             fixture: "register_source/validation_matrix/clr_unmappable.json",
