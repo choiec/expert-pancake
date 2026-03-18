@@ -125,7 +125,9 @@ Cutover cannot proceed until every checklist item is complete.
 
 ### Phase 1: Dry-run
 
-The migration command runs in dry-run mode first and emits one JSON report with this required structure:
+The migration command runs in dry-run mode first and emits one JSON report.
+
+The required structure below is the authoritative dry-run and migration-verification contract. The example uses illustrative values, but every emitted row must follow this exact field set and the conditional rules for `original_standard_id` and `raw_body_hash`.
 
 ```json
 {
@@ -143,21 +145,55 @@ The migration command runs in dry-run mode first and emits one JSON report with 
   "rows": [
     {
       "legacy_source_id": "uuid",
+      "legacy_external_id": "legacy-id-or-uri",
+      "candidate_canonical_external_id": "https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01",
+      "candidate_source_seed": "source|v1|https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01",
       "candidate_source_id": "uuid",
-      "canonical_external_id": "string",
       "classification": "migratable",
       "decision_reason": "LEGACY_ROW_MIGRATABLE",
       "legacy_resolution_path": "legacy_only",
+      "canonical_id_version": "v1",
+      "semantic_payload_hash": "hex",
+      "raw_body_hash_present": true,
+      "raw_body_hash": "hex",
       "dependent_reference_counts": {
         "memory_item": 0,
         "memory_index_job": 0,
         "search_projection": 0
       },
-      "action": "rewrite"
+      "planned_action": "rewrite"
+    },
+    {
+      "legacy_source_id": "uuid",
+      "legacy_external_id": "legacy-id-or-uri",
+      "candidate_canonical_external_id": "https://api.cherry-pick.net/qti/v3p0/kice.re.kr:20240621",
+      "candidate_source_seed": "source|v1|https://api.cherry-pick.net/qti/v3p0/kice.re.kr:20240621",
+      "candidate_source_id": "uuid",
+      "classification": "consolidate",
+      "decision_reason": "LEGACY_ROW_CONSOLIDATE_MATCH",
+      "legacy_resolution_path": "shadow_duplicate",
+      "canonical_id_version": "v1",
+      "original_standard_id": "urn:example:badge:001",
+      "semantic_payload_hash": "hex",
+      "raw_body_hash_present": false,
+      "dependent_reference_counts": {
+        "memory_item": 0,
+        "memory_index_job": 0,
+        "search_projection": 0
+      },
+      "planned_action": "consolidate"
     }
   ]
 }
 ```
+
+Required row rules:
+
+- Every row must include `legacy_source_id`, `legacy_external_id`, `candidate_canonical_external_id`, `candidate_source_seed`, `candidate_source_id`, `classification`, `decision_reason`, `legacy_resolution_path`, `canonical_id_version`, `semantic_payload_hash`, `raw_body_hash_present`, `dependent_reference_counts`, and `planned_action`.
+- Include `original_standard_id` only when it exists on the classified source.
+- Include `raw_body_hash` only when `raw_body_hash_present = true`.
+- `candidate_source_seed` must be exactly `source|{canonical_id_version}|{candidate_canonical_external_id}`.
+- Operator review is pass or fail from the JSON alone: recompute UUID v5 from each row's `candidate_source_seed` and stop if any recomputation does not equal the emitted `candidate_source_id`.
 
 ### Dry-run acceptance criteria
 
@@ -165,7 +201,9 @@ The migration command runs in dry-run mode first and emits one JSON report with 
 - `unmigratable_rows = 0`
 - `conflict_groups = 0`
 - `reference_gap_rows = 0`
-- every candidate `source_id` is derivable from `source|v1|{canonical_external_id}`
+- every row conforms to the authoritative required structure above
+- every row's `candidate_source_seed` equals `source|{canonical_id_version}|{candidate_canonical_external_id}`
+- every row's `candidate_source_id` is recomputed from that exact seed and rollout stops on any mismatch
 - every duplicate canonical identity is already resolved to `consolidate`
 
 Failure of any criterion stops rollout.
@@ -197,6 +235,7 @@ The rollout must execute verification queries that prove all of the following be
 5. Every `memory_index_job.source_id` points to an existing `memory_source.source_id`.
 6. The surviving authoritative source-row count equals the dry-run expected canonical identity count after consolidation.
 7. Dependent memory-item and index-job counts match the pre-migration counts after repointing.
+8. Every dry-run or execution row remains seed-reproducible: the emitted `candidate_source_seed` matches `source|{canonical_id_version}|{candidate_canonical_external_id}` and recomputes to the emitted `candidate_source_id`.
 
 ## Stop Conditions
 

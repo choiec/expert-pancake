@@ -226,7 +226,7 @@ Every canonicalization, replay, conflict, migration, and legacy lookup diagnosti
 
 ### Dry-Run Result Format
 
-The dry-run artifact is a machine-readable JSON document with this required structure:
+The dry-run artifact is a machine-readable JSON document. The required structure below is the authoritative contract for dry-run and migration verification output. Examples may use illustrative values, but they do not relax or replace the required field set, naming, or conditional-field rules.
 
 ```json
 {
@@ -244,26 +244,36 @@ The dry-run artifact is a machine-readable JSON document with this required stru
   "rows": [
     {
       "legacy_source_id": "uuid",
-      "candidate_source_id": "uuid",
       "legacy_external_id": "string",
-      "canonical_external_id": "string",
+      "candidate_canonical_external_id": "string",
+      "candidate_source_seed": "source|v1|https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01",
+      "candidate_source_id": "uuid",
+      "classification": "migratable",
+      "decision_reason": "LEGACY_ROW_MIGRATABLE",
+      "legacy_resolution_path": "legacy_only",
       "canonical_id_version": "v1",
       "original_standard_id": "string",
       "semantic_payload_hash": "hex",
       "raw_body_hash_present": true,
-      "classification": "migratable",
-      "decision_reason": "LEGACY_ROW_MIGRATABLE",
-      "legacy_resolution_path": "legacy_only",
+      "raw_body_hash": "hex",
       "dependent_reference_counts": {
         "memory_item": 0,
         "memory_index_job": 0,
         "search_projection": 0
       },
-      "action": "rewrite"
+      "planned_action": "rewrite"
     }
   ]
 }
 ```
+
+#### Row-level schema rules
+
+- `legacy_source_id`, `legacy_external_id`, `candidate_canonical_external_id`, `candidate_source_seed`, `candidate_source_id`, `classification`, `decision_reason`, `legacy_resolution_path`, `canonical_id_version`, `semantic_payload_hash`, `raw_body_hash_present`, `dependent_reference_counts`, and `planned_action` are required for every row.
+- `original_standard_id` is required when the classified source preserves a direct-standard provenance identifier and omitted otherwise.
+- `raw_body_hash` is required when `raw_body_hash_present = true` and omitted when `raw_body_hash_present = false`.
+- `candidate_source_seed` must equal the exact governed seed string `source|{canonical_id_version}|{candidate_canonical_external_id}` for that row.
+- Dry-run and verification must recompute `candidate_source_id` from `candidate_source_seed` and fail if the emitted UUID v5 does not match the recomputed value.
 
 ### Mixed-Population Coexistence Model
 
@@ -293,7 +303,9 @@ The dry-run artifact is a machine-readable JSON document with this required stru
 - `conflict_groups = 0`
 - `reference_gap_rows = 0`
 - every row classified
-- every target `source_id` derivable from `source|v1|{canonical_external_id}`
+- every row emits the authoritative schema above, including `candidate_source_seed`
+- every target `candidate_source_id` is recomputed from the exact governed seed `source|{canonical_id_version}|{candidate_canonical_external_id}`
+- dry-run fails if any emitted `candidate_source_id` does not equal the UUID v5 derived from the emitted `candidate_source_seed`
 - every canonical identity collision resolved to `consolidate` or rejected before execution
 
 #### Verification query requirements
@@ -307,6 +319,7 @@ The rollout must execute queries that prove all of the following:
 5. The count of authoritative source rows equals the dry-run expected surviving canonical identity count after consolidation.
 6. The count of dependent memory items and index jobs matches pre-migration counts after repointing.
 7. Every lookup by canonical `external_id` resolves to one deterministic `source_id`.
+8. Every dry-run and execution row remains seed-reproducible: `candidate_source_seed` equals `source|{canonical_id_version}|{candidate_canonical_external_id}` and recomputes to the emitted `candidate_source_id`.
 
 #### Snapshot and backup gates
 

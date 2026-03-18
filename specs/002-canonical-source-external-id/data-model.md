@@ -138,18 +138,27 @@ Defines the mapping from supported payloads to canonical URI components.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `legacy_source_id` | UUID | yes | Original source identifier |
-| `candidate_source_id` | UUID v5 | yes | Deterministic target identifier |
 | `legacy_external_id` | string | yes | Original stored external identifier |
-| `canonical_external_id` | string | yes | Candidate canonical URI |
+| `candidate_canonical_external_id` | string | yes | Candidate canonical URI |
+| `candidate_source_seed` | string | yes | Exact governed seed `source|{canonical_id_version}|{candidate_canonical_external_id}` |
+| `candidate_source_id` | UUID v5 | yes | Deterministic target identifier recomputed from `candidate_source_seed` |
+| `classification` | enum | yes | `migratable`, `consolidate`, `unmigratable` |
+| `decision_reason` | string | yes | One taxonomy value from the plan |
+| `legacy_resolution_path` | enum | yes | `legacy_only`, `remapped_source_id`, `canonical_only`, or `shadow_duplicate` |
 | `canonical_id_version` | string | yes | `v1` |
 | `original_standard_id` | string | no | Preserved provenance when present |
 | `semantic_payload_hash` | string | yes | Authoritative semantic comparator |
 | `raw_body_hash_present` | bool | yes | Signals diagnostics-only raw-body hash availability |
-| `classification` | enum | yes | `migratable`, `consolidate`, `unmigratable` |
-| `decision_reason` | string | yes | One taxonomy value from the plan |
-| `legacy_resolution_path` | enum | yes | `legacy_only`, `remapped_source_id`, `canonical_only`, or `shadow_duplicate` |
+| `raw_body_hash` | string | no | Present only when `raw_body_hash_present = true` |
 | `dependent_reference_counts` | object | yes | Counts for `memory_item`, `memory_index_job`, and search projections |
-| `action` | enum | yes | `rewrite`, `consolidate`, or `abort` |
+| `planned_action` | enum | yes | `rewrite`, `consolidate`, or `abort` |
+
+#### Migration row report invariants
+
+- `candidate_source_seed` is always the exact string `source|{canonical_id_version}|{candidate_canonical_external_id}`.
+- `candidate_source_id` must equal the UUID v5 derived from `candidate_source_seed`; classification and verification fail on any mismatch.
+- `raw_body_hash` is present if and only if `raw_body_hash_present = true`.
+- The row must remain reviewable without hidden derivation rules: an operator can recompute `candidate_source_id` from the emitted row alone.
 
 ### Mixed-Population Lookup State
 
