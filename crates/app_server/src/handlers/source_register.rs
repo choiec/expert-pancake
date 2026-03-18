@@ -135,8 +135,6 @@ async fn register_source_inner(
         canonical_id_version = ?payload.source_metadata.pointer("/system/canonical_id_version").and_then(|value| value.as_str()),
         semantic_payload_hash = ?payload.source_metadata.pointer("/system/semantic_payload_hash").and_then(|value| value.as_str()),
         raw_body_hash_present = false,
-        migration_phase = %result.migration_phase,
-        legacy_resolution_path = %result.legacy_resolution_path,
         decision_reason = %result.decision_reason,
         ingest_kind = %ingest_kind.as_str(),
         "register_source completed"
@@ -149,7 +147,6 @@ async fn register_source_inner(
             IngestKind::Canonical => "canonical",
             IngestKind::DirectStandard => "direct_standard",
         })
-        .with_migration_phase(&result.migration_phase)
         .with_decision_reason(&result.decision_reason)
         .insert_response_extension(&mut response);
     Ok(response)
@@ -268,7 +265,9 @@ fn map_body_error(error: axum::Error) -> AppError {
 
 #[cfg(test)]
 mod tests {
-    use super::{StandardFamily, canonicalize_standard_payload};
+    use mod_memory::domain::source_external_id::{
+        DirectStandardProfile, canonicalize_direct_standard_payload,
+    };
     use serde_json::json;
 
     #[test]
@@ -280,11 +279,18 @@ mod tests {
             "name": " Rust Badge "
         });
 
-        let standard = canonicalize_standard_payload(&payload, "{}")
+        let standard = canonicalize_direct_standard_payload(&payload)
             .expect("open badges payload should canonicalize");
 
-        assert_eq!(standard.family, StandardFamily::OpenBadges);
-        assert_eq!(standard.external_id, "urn:badge:1");
+        assert_eq!(
+            standard.profile,
+            DirectStandardProfile::OpenBadgesAchievementCredential
+        );
+        assert_eq!(
+            standard.external_id.canonical_uri(),
+            "https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Abadge%3A1"
+        );
+        assert_eq!(standard.original_standard_id, "urn:badge:1");
         assert_eq!(standard.title, "Rust Badge");
     }
 
@@ -297,7 +303,7 @@ mod tests {
             "name": "Example"
         });
 
-        let error = canonicalize_standard_payload(&payload, "{}")
+        let error = canonicalize_direct_standard_payload(&payload)
             .expect_err("unsupported family must fail");
 
         assert_eq!(error.error_code(), "INVALID_STANDARD_PAYLOAD");

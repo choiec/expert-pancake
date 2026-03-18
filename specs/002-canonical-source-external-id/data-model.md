@@ -2,18 +2,16 @@
 
 ## Purpose
 
-Define the authoritative entities, invariants, migration report model, and operational diagnostics model for canonical source identity and deterministic source-id rollout.
+Define the authoritative entities and invariants for the simplified 002-only system.
 
-## Canonical Entities
-
-### Source
+## Source
 
 Represents the authoritative stored source after canonical identity validation or derivation.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `source_id` | UUID v5 | yes | Internal deterministic immutable identifier derived from the canonical source seed |
-| `external_id` | string | yes | Canonical project-owned URI for every governed row |
+| `source_id` | UUID v5 | yes | Deterministic identifier derived from canonical identity |
+| `external_id` | string | yes | Canonical project-owned URI |
 | `title` | string | yes | Non-empty after trim |
 | `summary` | string | no | Present only when supplied |
 | `document_type` | enum | yes | `text`, `markdown`, or `json` |
@@ -21,34 +19,34 @@ Represents the authoritative stored source after canonical identity validation o
 | `created_at` | timestamp | yes | First successful registration time |
 | `updated_at` | timestamp | yes | Equal to `created_at` in this immutable slice |
 
-#### Invariants
+### Source invariants
 
-- `source_id` is derived from the exact seed string `source|{canonical_id_version}|{canonical_external_id}`.
-- `external_id` for every governed row parses as canonical URI grammar `v1`.
+- `source_id` is derived from `source|v1|{canonical_external_id}`.
+- `external_id` always parses as canonical URI grammar `v1`.
 - `source_metadata.system` is server-managed and cannot be overwritten by caller payloads.
-- No authoritative row retains `canonical_payload_hash` after migration rewrite.
+- No authoritative row uses legacy alias fields or transition-only metadata.
 
-### Source External ID
+## Canonical Source External ID
 
 Domain value object representing canonical source identity.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `standard` | string | yes | Canonical lower-case family token from the vocabulary registry |
-| `version` | string | yes | Canonical lower-case version token such as `v1p3` |
+| `family` | string | yes | Canonical lower-case family token |
+| `version` | string | yes | Canonical lower-case version token |
 | `source_domain` | string | yes | Normalized trusted authority host |
 | `object_id_raw` | string | yes | Outer-trimmed producer-local identity |
 | `object_id_normalized` | string | yes | Percent-encoded canonical object-id segment |
-| `canonical_uri` | string | yes | `https://api.cherry-pick.net/{standard}/{version}/{source-domain}:{object-id}` |
-| `canonical_id_version` | enum | yes | `v1` |
+| `canonical_uri` | string | yes | `https://api.cherry-pick.net/{family}/{version}/{source-domain}:{object-id}` |
+| `canonical_id_version` | string | yes | `v1` |
 
-#### Construction Rules
+### Construction rules
 
 - Canonical/manual ingest uses `parse_canonical_uri()` and rejects out-of-namespace or invalid grammar.
-- Direct-standard ingest uses `from_components()` after resolving trusted domain, registry entry, and object-id.
+- Direct-standard ingest uses `from_components()` after resolving trusted domain and normalized object id.
 - `object_id` outer trim is the only trimming step. Internal spaces, case, punctuation, and leading zeroes remain semantically meaningful.
 
-### Source Identity Provenance
+## Source provenance
 
 Reserved server-managed metadata stored under `source_metadata.system`.
 
@@ -58,58 +56,33 @@ Reserved server-managed metadata stored under `source_metadata.system`.
 | `ingest_kind` | enum | yes | `canonical` or `direct_standard` |
 | `semantic_payload_hash` | string | yes | Authoritative replay and conflict comparison value |
 | `original_standard_id` | string | no | Present only for direct-standard rows |
-| `raw_body_hash` | string | no | Stored only when a raw body exists; internal diagnostics only |
+| `raw_body_hash` | string | no | Diagnostics-only field, never public |
 
-#### Public versus internal surface
+### Provenance surface rules
 
 - Public API responses expose `canonical_id_version`, `ingest_kind`, `semantic_payload_hash`, and `original_standard_id` when present.
-- `raw_body_hash` remains internal and is omitted from public API responses.
-- Legacy `canonical_payload_hash` is not part of the public or authoritative model.
+- `raw_body_hash` remains internal and is omitted from public responses.
 
-### Deterministic Source Identifier
+## Direct-standard mapping
 
-Internal identifier contract for authoritative source storage.
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `source_id` | UUID v5 | yes | Derived from fixed namespace plus canonical source seed |
-| `source_seed` | string | yes | `source|{canonical_id_version}|{canonical_external_id}` |
-
-#### Seed Rules
-
-- `canonical_id_version` is always part of the seed.
-- Canonical external identity is the only semantic source of seed material.
-- Raw body, raw payload formatting, transport headers, and provenance aliases never enter the seed.
-
-### Direct-Standard Mapping Rule
-
-Defines the mapping from supported payloads to canonical URI components.
+Defines how supported standard payloads become canonical source identities.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `profile` | string | yes | `open_badges_achievement_credential` or `clr_credential` |
-| `standard` | string | yes | Registry-defined canonical family token |
-| `version` | string | yes | Registry-defined canonical version token |
-| `source_domain` | string | yes | Trusted host derived from payload metadata or ingest context |
+| `family` | string | yes | Canonical registry token |
+| `version` | string | yes | Canonical registry token |
+| `source_domain` | string | yes | Trusted domain derived from payload metadata |
 | `object_id_raw` | string | yes | Top-level payload `id` after outer trim |
-| `object_id_normalized` | string | yes | Percent-encoded canonical segment |
 | `original_standard_id` | string | yes | Preserved raw payload `id` |
 
-#### Validation Rules
+### Mapping rules
 
 - Mapping fails if the payload cannot be classified to exactly one supported profile.
 - Mapping fails if no trusted `source_domain` can be derived.
-- Mapping fails if `object_id_raw` is empty after trim or exceeds raw or encoded bounds.
+- Mapping fails if `object_id_raw` is empty after trim or exceeds normalization bounds.
 
-## Replay and Conflict Model
-
-### Replay Key
-
-- Primary identity key: canonical `external_id`
-- Internal source key: deterministic `source_id`
-- Semantic comparator: `source_metadata.system.semantic_payload_hash`
-
-### Decision Table
+## Replay and conflict model
 
 | Existing canonical `external_id` | Existing semantic hash | Incoming semantic hash | Outcome |
 |---|---|---|---|
@@ -117,97 +90,41 @@ Defines the mapping from supported payloads to canonical URI components.
 | match | match | match | replay existing source |
 | match | differs | differs | conflict |
 
-### Raw Body Retention
+### Replay rules
 
-- The first accepted direct-standard raw body remains the authoritative retrieval body.
-- Replays do not overwrite retained body content.
-- `raw_body_hash` exists only for audit and diagnostics.
+- `semantic_payload_hash` is the only authoritative comparator.
+- `raw_body_hash` does not affect replay or conflict decisions.
+- The first accepted direct-standard raw body remains the authoritative retrieval body for replays.
 
-## Migration Model
+## Operational diagnostics
 
-### Legacy Row Classification
+Structured logs and traces may emit the following fields when known:
 
-| Classification | Definition | Target action |
-|---|---|---|
-| `migratable` | canonical identity, deterministic seed, semantic hash, and reference rewrite are complete | rewrite row and references |
-| `consolidate` | two or more rows resolve to one canonical identity and one semantic hash | repoint references to surviving target row and remove duplicates |
-| `unmigratable` | canonical identity, semantic equivalence, or reference coverage is incomplete or conflicting | abort cutover |
+- `request_id`
+- `trace_id`
+- `handler`
+- `route`
+- `method`
+- `source_id`
+- `canonical_external_id`
+- `original_standard_id`
+- `canonical_id_version`
+- `semantic_payload_hash`
+- `raw_body_hash_present`
+- `decision_reason`
+- `ingest_kind`
 
-### Migration Row Report
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `legacy_source_id` | UUID | yes | Original source identifier |
-| `legacy_external_id` | string | yes | Original stored external identifier |
-| `candidate_canonical_external_id` | string | yes | Candidate canonical URI |
-| `candidate_source_seed` | string | yes | Exact governed seed `source|{canonical_id_version}|{candidate_canonical_external_id}` |
-| `candidate_source_id` | UUID v5 | yes | Deterministic target identifier recomputed from `candidate_source_seed` |
-| `classification` | enum | yes | `migratable`, `consolidate`, `unmigratable` |
-| `decision_reason` | string | yes | One taxonomy value from the plan |
-| `legacy_resolution_path` | enum | yes | `legacy_only`, `remapped_source_id`, `canonical_only`, or `shadow_duplicate` |
-| `canonical_id_version` | string | yes | `v1` |
-| `original_standard_id` | string | no | Preserved provenance when present |
-| `semantic_payload_hash` | string | yes | Authoritative semantic comparator |
-| `raw_body_hash_present` | bool | yes | Signals diagnostics-only raw-body hash availability |
-| `raw_body_hash` | string | no | Present only when `raw_body_hash_present = true` |
-| `dependent_reference_counts` | object | yes | Counts for `memory_item`, `memory_index_job`, and search projections |
-| `planned_action` | enum | yes | `rewrite`, `consolidate`, or `abort` |
-
-#### Migration row report invariants
-
-- `candidate_source_seed` is always the exact string `source|{canonical_id_version}|{candidate_canonical_external_id}`.
-- `candidate_source_id` must equal the UUID v5 derived from `candidate_source_seed`; classification and verification fail on any mismatch.
-- `raw_body_hash` is present if and only if `raw_body_hash_present = true`.
-- The row must remain reviewable without hidden derivation rules: an operator can recompute `candidate_source_id` from the emitted row alone.
-
-### Mixed-Population Lookup State
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `legacy_source_id` | UUID | yes | Pre-migration identifier |
-| `target_source_id` | UUID v5 | yes | Deterministic target identifier |
-| `legacy_resolution_path` | enum | yes | Lookup path used during migration window |
-| `migration_phase` | enum | yes | `dry_run`, `rewrite`, `verification`, `cutover`, or `rollback` |
-
-#### Invariants
-
-- Registration writes are disabled during `rewrite` and `verification`.
-- Retrieval by legacy `source_id` resolves through the remap state during the migration window.
-- Steady state after `cutover` has no legacy-only authoritative rows.
-
-## Operational Diagnostics Model
-
-### Decision Diagnostic Event
-
-Internal structured log or trace event emitted for canonicalization, replay, conflict, migration, or legacy lookup resolution.
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `request_id` | string | yes | Request correlation key |
-| `trace_id` | string | yes | W3C trace correlation key when present |
-| `handler` | string | yes | Handler or offline command name |
-| `route` | string | yes | HTTP route or offline command route token |
-| `method` | string | yes | HTTP method or command verb |
-| `source_id` | UUID | no | Internal source identifier after resolution |
-| `canonical_external_id` | string | no | Canonical identity under evaluation |
-| `original_standard_id` | string | no | Direct-standard provenance |
-| `canonical_id_version` | string | yes | `v1` |
-| `semantic_payload_hash` | string | no | Authoritative comparator |
-| `raw_body_hash` | string | no | Diagnostics-only raw-body hash |
-| `raw_body_hash_present` | bool | yes | Signals hash availability |
-| `migration_phase` | string | yes | Current migration phase or `steady_state` |
-| `legacy_resolution_path` | string | yes | Lookup path taken |
-| `decision_reason` | string | yes | One closed taxonomy value |
-| `ingest_kind` | string | yes | `canonical` or `direct_standard` |
-
-### Metrics Label Set
+### Metrics label set
 
 - `method`
 - `route`
 - `status_code`
 - `document_type`
 - `ingest_kind`
-- `migration_phase`
 - `decision_reason`
 
-Hashes and identifiers are excluded from metrics labels.
+Hashes, canonical identifiers, and raw-body values are excluded from metrics labels.
+
+## Explicit omission
+
+This data model does not define migration reports, remap tables, transition phases, or rollback artifacts. Those structures were intentionally removed for the pre-production Option A implementation.

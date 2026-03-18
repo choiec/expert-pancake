@@ -82,8 +82,6 @@ pub struct RegisterSourceResult {
     pub indexing_status: PublicIndexingStatus,
     pub replayed: bool,
     pub decision_reason: String,
-    pub migration_phase: String,
-    pub legacy_resolution_path: String,
 }
 
 pub struct RegisterSourceService {
@@ -173,8 +171,6 @@ impl RegisterSourceService {
                     semantic_payload_hash = %semantic_payload_hash,
                     ingest_kind = %ingest_kind.as_str(),
                     decision_reason = "REPLAY_SEMANTIC_MATCH",
-                    migration_phase = %bundle.migration_phase,
-                    legacy_resolution_path = %bundle.legacy_resolution_path,
                     "source registration replayed"
                 );
                 Ok(Self::into_result(
@@ -204,8 +200,6 @@ impl RegisterSourceService {
                     original_standard_id = ?original_standard_id,
                     ingest_kind = %ingest_kind.as_str(),
                     decision_reason = decision_reason,
-                    migration_phase = %bundle.migration_phase,
-                    legacy_resolution_path = %bundle.legacy_resolution_path,
                     "source registration created"
                 );
                 Ok(Self::into_result(
@@ -239,8 +233,6 @@ impl RegisterSourceService {
             indexing_status: bundle.indexing_status,
             replayed,
             decision_reason,
-            migration_phase: bundle.migration_phase,
-            legacy_resolution_path: bundle.legacy_resolution_path,
         }
     }
 }

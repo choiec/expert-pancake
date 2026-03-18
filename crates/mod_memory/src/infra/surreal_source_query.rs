@@ -46,16 +46,11 @@ impl RuntimeSurrealSourceQueryRepository {
 #[async_trait]
 impl SourceQueryRepository for SurrealSourceQueryRepository {
     async fn get_source(&self, source_id: Uuid) -> AppResult<SourceBundle> {
-        let (bundle, migration_phase, legacy_resolution_path) = self
+        let bundle = self
             .db
-            .get_source_bundle_with_resolution(source_id)
+            .get_source_bundle(source_id)
             .ok_or_else(|| AppError::not_found(format!("source '{}' was not found", source_id)))?;
-        bundle_from_records(
-            bundle,
-            self.db.search_available(),
-            &migration_phase,
-            &legacy_resolution_path,
-        )
+        bundle_from_records(bundle, self.db.search_available())
     }
 }
 
@@ -65,6 +60,6 @@ impl SourceQueryRepository for RuntimeSurrealSourceQueryRepository {
         let bundle = fetch_source_bundle_by_source_id(self.db.as_ref(), source_id)
             .await?
             .ok_or_else(|| AppError::not_found(format!("source '{}' was not found", source_id)))?;
-        bundle_from_records(bundle, self.search_available(), "steady_state", "canonical_only")
+        bundle_from_records(bundle, self.search_available())
     }
 }

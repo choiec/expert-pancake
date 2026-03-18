@@ -1,13 +1,15 @@
 # Memory Ingest Workspace
 
-This workspace ships the `001-memory-ingest` vertical slice:
+This workspace now runs the simplified `002-canonical-source-external-id` model.
 
-- `POST /sources/register` accepts canonical JSON plus direct Open Badges and CLR JSON.
+- `POST /sources/register` accepts only canonical manual URIs plus supported direct-standard Open Badges and CLR JSON.
 - `GET /sources/{source-id}` and `GET /memory-items/{urn}` read authoritative SurrealDB-backed records.
 - `GET /search/memory-items` reads a non-authoritative Meilisearch projection.
 - `GET /health` is local-only liveness.
 - `GET /ready` is dependency-aware readiness for the authoritative write path.
 - Request tracing and Prometheus-compatible latency histograms are emitted for every public endpoint.
+
+This project is still pre-production. Legacy compatibility, migration, mixed-population handling, cutover support, and rollback tooling are intentionally omitted. The repository implements only the canonical 002 semantics that new data must follow.
 
 ## Local Setup
 
@@ -103,9 +105,17 @@ Expected registration contract:
 - First successful ingest returns `201 Created`.
 - Idempotent replay of the same semantic payload hash returns `200 OK` with the same `source_id` and `memory_items`.
 - Conflicting replay for the same `external-id` returns `409 Conflict`.
+- `source_id` is deterministic UUID v5 derived from `source|v1|{canonical_external_id}`.
 - Public `indexing_status` is always one of `queued`, `indexed`, or `deferred`.
 - Direct-standard success always returns `document_type: json` and exactly one `json_document` memory item.
 - Public provenance is exposed under `source_metadata.system` with `canonical_id_version`, `ingest_kind`, `semantic_payload_hash`, and `original_standard_id` when present.
+
+Rejected behavior in this repository:
+
+- Non-canonical manual `external-id` inputs.
+- Using `raw_body_hash` as a replay or conflict input.
+- Legacy alias resolution or remapped `source_id` lookup.
+- Migration-specific write freezes, dry-runs, cutovers, or rollback flows.
 
 Retrieve authoritative records:
 

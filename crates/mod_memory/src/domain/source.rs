@@ -154,10 +154,6 @@ pub fn public_source_metadata(source_metadata: &Value) -> Value {
 
     if let Some(Value::Object(system)) = metadata_object.get_mut("system") {
         system.remove("raw_body_hash");
-        system.remove("canonical_payload_hash");
-        system.remove("migration_phase");
-        system.remove("legacy_resolution_path");
-        system.remove("decision_reason");
     }
 
     Value::Object(metadata_object)

@@ -63,7 +63,7 @@ impl MemoryRepository for SurrealMemoryRepository {
         match outcome {
             CommitRegistrationOutcome::Created(bundle)
             | CommitRegistrationOutcome::Replay(bundle) => {
-                bundle_from_records(bundle, self.db.search_available(), "steady_state", "canonical_only")
+                bundle_from_records(bundle, self.db.search_available())
             }
         }
     }
@@ -96,7 +96,7 @@ impl MemoryRepository for RuntimeSurrealMemoryRepository {
                                 source.external_id
                             ))
                         })?;
-                bundle_from_records(bundle, self.search_available(), "steady_state", "canonical_only")
+                bundle_from_records(bundle, self.search_available())
             }
             Err(error) if error.kind() == core_shared::ErrorKind::Conflict => {
                 let Some(existing) =
@@ -112,7 +112,7 @@ impl MemoryRepository for RuntimeSurrealMemoryRepository {
                     .and_then(serde_json::Value::as_str)
                     .unwrap_or_default();
                 if existing_hash == source.semantic_payload_hash() {
-                    bundle_from_records(existing, self.search_available(), "steady_state", "canonical_only")
+                    bundle_from_records(existing, self.search_available())
                 } else {
                     Err(AppError::conflict(format!(
                         "external_id '{}' is already registered with a different semantic payload",

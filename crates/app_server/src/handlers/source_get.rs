@@ -88,8 +88,6 @@ async fn get_source_inner(
         canonical_id_version = ?result.source_metadata.pointer("/system/canonical_id_version").and_then(|value| value.as_str()),
         semantic_payload_hash = ?result.source_metadata.pointer("/system/semantic_payload_hash").and_then(|value| value.as_str()),
         raw_body_hash_present = false,
-        migration_phase = %result.migration_phase,
-        legacy_resolution_path = %result.legacy_resolution_path,
         decision_reason = %result.decision_reason,
         ingest_kind = ?result.source_metadata.pointer("/system/ingest_kind").and_then(|value| value.as_str()),
         "get_source completed"
@@ -98,7 +96,6 @@ async fn get_source_inner(
     let mut response = Json(payload).into_response();
     MetricsLabels::new()
         .with_document_type(result.document_type.as_str())
-        .with_migration_phase(&result.migration_phase)
         .with_decision_reason(&result.decision_reason)
         .insert_response_extension(&mut response);
     Ok(response)

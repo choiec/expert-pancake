@@ -91,7 +91,6 @@ pub struct MetricKey {
     pub status_code: u16,
     pub document_type: Option<String>,
     pub ingest_kind: Option<String>,
-    pub migration_phase: Option<String>,
     pub decision_reason: Option<String>,
 }
 
@@ -118,7 +117,6 @@ struct BucketCount {
 pub struct MetricsLabels {
     pub document_type: Option<String>,
     pub ingest_kind: Option<String>,
-    pub migration_phase: Option<String>,
     pub decision_reason: Option<String>,
 }
 
@@ -294,11 +292,6 @@ impl MetricsLabels {
         self
     }
 
-    pub fn with_migration_phase(mut self, migration_phase: impl Into<String>) -> Self {
-        self.migration_phase = Some(migration_phase.into());
-        self
-    }
-
     pub fn with_decision_reason(mut self, decision_reason: impl Into<String>) -> Self {
         self.decision_reason = Some(decision_reason.into());
         self
@@ -460,13 +453,12 @@ impl RequestMetrics {
 
         for (key, series) in guard.iter() {
             let labels = format!(
-                "method=\"{}\",route=\"{}\",status_code=\"{}\",document_type=\"{}\",ingest_kind=\"{}\",migration_phase=\"{}\",decision_reason=\"{}\"",
+                "method=\"{}\",route=\"{}\",status_code=\"{}\",document_type=\"{}\",ingest_kind=\"{}\",decision_reason=\"{}\"",
                 key.method,
                 key.route,
                 key.status_code,
                 key.document_type.as_deref().unwrap_or("unknown"),
                 key.ingest_kind.as_deref().unwrap_or("unknown"),
-                key.migration_phase.as_deref().unwrap_or("unknown"),
                 key.decision_reason.as_deref().unwrap_or("unknown"),
             );
 

@@ -35,8 +35,6 @@ pub struct GetSourceResult {
     pub created_at: OffsetDateTime,
     pub updated_at: OffsetDateTime,
     pub indexing_status: PublicIndexingStatus,
-    pub migration_phase: String,
-    pub legacy_resolution_path: String,
     pub decision_reason: String,
     pub memory_items: Vec<SourceMemoryItemResult>,
 }
@@ -64,13 +62,7 @@ impl GetSourceService {
             created_at: source.created_at,
             updated_at: source.updated_at,
             indexing_status: bundle.indexing_status,
-            decision_reason: if bundle.legacy_resolution_path == "remapped_source_id" {
-                "LOOKUP_RESOLVED_LEGACY_ALIAS".to_owned()
-            } else {
-                "LOOKUP_RESOLVED_CANONICAL".to_owned()
-            },
-            migration_phase: bundle.migration_phase,
-            legacy_resolution_path: bundle.legacy_resolution_path,
+            decision_reason: "LOOKUP_RESOLVED_CANONICAL".to_owned(),
             memory_items: bundle
                 .memory_items
                 .into_iter()
