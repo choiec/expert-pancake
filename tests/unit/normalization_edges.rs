@@ -82,7 +82,7 @@ fn direct_standard_json_creates_one_json_document_item() {
             summary: Some("json document"),
             document_type: DocumentType::Json,
             authoritative_content: raw_body,
-            source_metadata: &serde_json::json!({"family": "clr"}),
+            source_metadata: &serde_json::json!({"standard": "clr"}),
             created_at,
         },
         &generator,

@@ -5,7 +5,7 @@ description: >-
   tokens. Persisted external_id values must use only the canonical tokens listed
   here. Aliases are accepted only as input mapping hints and must never be
   persisted.
-families:
+standards:
   - code: cc
     display_name: Common Cartridge
     persisted_versions:
@@ -43,14 +43,14 @@ families:
       - clrc
 direct_standard_profiles:
   - profile: open_badges_achievement_credential
-    family: ob
+    standard: ob
     version: v2p0
     trusted_domain_sources:
       - issuer.id
       - ingest_context.producer_domain
     object_id_source: $.id
   - profile: clr_credential
-    family: clr
+    standard: clr
     version: v2p0
     trusted_domain_sources:
       - publisher.id

@@ -543,9 +543,9 @@ components:
     SourceSystemMetadata:
       type: object
       description: >-
-        Public provenance contract. Internal diagnostics such as raw_body_hash,
-        migration_phase, legacy_resolution_path, and operator decision reasons
-        are intentionally excluded from this schema.
+        Public provenance contract. Internal diagnostics such as raw_body_hash
+        and operator decision reasons are intentionally excluded from this
+        schema.
       required:
         - canonical_id_version
         - ingest_kind

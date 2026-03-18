@@ -304,7 +304,7 @@ mod tests {
         });
 
         let error = canonicalize_direct_standard_payload(&payload)
-            .expect_err("unsupported family must fail");
+            .expect_err("unsupported standard must fail");
 
         assert_eq!(error.error_code(), "INVALID_STANDARD_PAYLOAD");
     }

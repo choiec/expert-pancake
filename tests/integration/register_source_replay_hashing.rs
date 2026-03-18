@@ -131,7 +131,7 @@ async fn clr_formatting_only_replay_preserves_the_first_authoritative_raw_body()
             summary: Some("clr replay test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: first_body.to_owned(),
-            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "standard": "clr"}),
             semantic_payload_hash: normalized_json_hash_from_str(first_body)
                 .expect("compact CLR should hash"),
             original_standard_id: Some("https://clr.example/credentials/123".to_owned()),
@@ -148,7 +148,7 @@ async fn clr_formatting_only_replay_preserves_the_first_authoritative_raw_body()
             summary: Some("clr replay test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: replay_body.to_owned(),
-            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "standard": "clr"}),
             semantic_payload_hash: normalized_json_hash_from_str(replay_body)
                 .expect("formatted CLR should hash"),
             original_standard_id: Some("https://clr.example/credentials/123".to_owned()),
@@ -190,7 +190,7 @@ async fn clr_semantic_conflict_returns_conflict_without_overwriting_first_body()
             summary: Some("clr conflict test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: first_body.to_owned(),
-            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "standard": "clr"}),
             semantic_payload_hash: normalized_json_hash_from_str(first_body)
                 .expect("compact CLR should hash"),
             original_standard_id: Some("https://clr.example/credentials/123".to_owned()),
@@ -207,7 +207,7 @@ async fn clr_semantic_conflict_returns_conflict_without_overwriting_first_body()
             summary: Some("clr conflict test".to_owned()),
             document_type: DocumentType::Json,
             authoritative_content: conflicting_body.to_owned(),
-            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "family": "clr"}),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org", "standard": "clr"}),
             semantic_payload_hash: normalized_json_hash_from_str(conflicting_body)
                 .expect("conflicting CLR should hash"),
             original_standard_id: Some("https://clr.example/credentials/123".to_owned()),

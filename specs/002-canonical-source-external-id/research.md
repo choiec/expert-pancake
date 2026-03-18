@@ -6,9 +6,9 @@ Record the decisions behind the chosen Option A implementation: a pre-production
 
 ## Decision 1: Persist only canonical project-owned URIs
 
-- Persist governed `external_id` values only as `https://api.cherry-pick.net/{family}/{version}/{source-domain}:{object-id}`.
+- Persist governed `external_id` values only as `https://api.cherry-pick.net/{standard}/{version}/{source-domain}:{object-id}`.
 - Reject manual inputs that are not already in canonical form.
-- Keep canonical family and version tokens under repository governance.
+- Keep canonical standard and version tokens under repository governance.
 
 ## Decision 2: Derive direct-standard identity from trusted provenance
 

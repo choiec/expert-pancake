@@ -49,7 +49,7 @@ impl CanonicalSourceExternalId {
             .filter(|value| !value.is_empty())
             .ok_or_else(|| AppError::validation("external_id is missing the identity segment"))?;
 
-        ensure_supported_family_version(standard, version)?;
+        ensure_supported_standard_version(standard, version)?;
 
         let Some(separator) = tail.find(':') else {
             return Err(AppError::validation(
@@ -94,7 +94,7 @@ impl CanonicalSourceExternalId {
         source_domain: &str,
         object_id_raw: &str,
     ) -> AppResult<Self> {
-        ensure_supported_family_version(standard, version)?;
+        ensure_supported_standard_version(standard, version)?;
         Ok(Self {
             standard: standard.to_owned(),
             version: version.to_owned(),
@@ -146,7 +146,7 @@ pub fn canonicalize_direct_standard_payload(
         DirectStandardProfile::ClrCredential
     } else {
         return Err(AppError::validation(
-            "supported-standard payload could not be mapped to a supported family",
+            "supported-standard payload could not be mapped to a supported standard",
         )
         .with_error_code("INVALID_STANDARD_PAYLOAD"));
     };
@@ -250,7 +250,7 @@ fn has_type(types: &[String], markers: &[&str]) -> bool {
         .any(|value| markers.iter().any(|marker| value == marker))
 }
 
-fn ensure_supported_family_version(standard: &str, version: &str) -> AppResult<()> {
+fn ensure_supported_standard_version(standard: &str, version: &str) -> AppResult<()> {
     let supported = matches!(
         (standard, version),
         ("cc", "v1p3")
@@ -263,7 +263,7 @@ fn ensure_supported_family_version(standard: &str, version: &str) -> AppResult<(
         Ok(())
     } else {
         Err(AppError::validation(
-            "external_id must use a supported canonical family/version token",
+            "external_id must use a supported canonical standard/version token",
         ))
     }
 }

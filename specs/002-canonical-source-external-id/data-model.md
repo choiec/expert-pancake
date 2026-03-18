@@ -32,12 +32,12 @@ Domain value object representing canonical source identity.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `family` | string | yes | Canonical lower-case family token |
+| `standard` | string | yes | Canonical lower-case standard token |
 | `version` | string | yes | Canonical lower-case version token |
 | `source_domain` | string | yes | Normalized trusted authority host |
 | `object_id_raw` | string | yes | Outer-trimmed producer-local identity |
 | `object_id_normalized` | string | yes | Percent-encoded canonical object-id segment |
-| `canonical_uri` | string | yes | `https://api.cherry-pick.net/{family}/{version}/{source-domain}:{object-id}` |
+| `canonical_uri` | string | yes | `https://api.cherry-pick.net/{standard}/{version}/{source-domain}:{object-id}` |
 | `canonical_id_version` | string | yes | `v1` |
 
 ### Construction rules
@@ -70,7 +70,7 @@ Defines how supported standard payloads become canonical source identities.
 | Field | Type | Required | Notes |
 |---|---|---|---|
 | `profile` | string | yes | `open_badges_achievement_credential` or `clr_credential` |
-| `family` | string | yes | Canonical registry token |
+| `standard` | string | yes | Canonical registry token |
 | `version` | string | yes | Canonical registry token |
 | `source_domain` | string | yes | Trusted domain derived from payload metadata |
 | `object_id_raw` | string | yes | Top-level payload `id` after outer trim |

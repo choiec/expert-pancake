@@ -48,7 +48,7 @@ A caller can distinguish canonical platform identity from original standard prov
 
 ### Functional requirements
 
-- **FR-001**: The system MUST persist `external_id` only under `https://api.cherry-pick.net/{family}/{version}/{source-domain}:{object-id}`.
+- **FR-001**: The system MUST persist `external_id` only under `https://api.cherry-pick.net/{standard}/{version}/{source-domain}:{object-id}`.
 - **FR-002**: Canonical/manual ingest MUST accept only caller-supplied `external_id` values that already match the canonical URI grammar.
 - **FR-003**: Direct-standard ingest MUST derive canonical `external_id` from trusted institution domain plus original standard `id`.
 - **FR-004**: The system MUST preserve the direct-standard payload `id` as `source_metadata.system.original_standard_id` and MUST keep it distinct from `external_id`.
