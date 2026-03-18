@@ -197,6 +197,16 @@ Projection documents are always rehydrated from authoritative `memory_source` an
 
 ## Validation Commands
 
+Release-shaped closeout verification:
+
+```bash
+cargo test --tests
+cargo test --test memory_ingest_slo -- --nocapture
+cargo bench --bench memory_ingest_latency --no-run
+```
+
+This sequence validates the full contract, integration, and unit surface, runs the published SLO gate, and confirms the benchmark target remains executable.
+
 Core verification suites:
 
 ```bash

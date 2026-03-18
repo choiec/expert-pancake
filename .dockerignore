@@ -1,10 +1,13 @@
 target/
 debug/
 release/
+tmp/
 .git/
 .gitignore
 .dockerignore
 Dockerfile*
+.vscode/
+.idea/
 node_modules/
 coverage/
 *.log*

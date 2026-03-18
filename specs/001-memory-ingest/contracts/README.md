@@ -32,6 +32,19 @@ This directory contains the public HTTP contract for the first memory-ingest ver
 
 ## Verification Commands
 
+Run the full contract checkpoint, including route-to-OpenAPI smoke verification:
+
+```bash
+cargo test --test get_memory_item_contract \
+	--test get_source_contract \
+	--test health_readiness_contract \
+	--test register_source_contract \
+	--test register_source_standard_errors \
+	--test register_source_standard_validation_matrix \
+	--test search_memory_items_contract \
+	--test openapi_smoke
+```
+
 Run the replay hashing and authoritative outbox mapping verification:
 
 ```bash

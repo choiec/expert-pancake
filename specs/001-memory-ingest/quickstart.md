@@ -191,6 +191,16 @@ Supported recovery guidance for this slice:
 
 ## Benchmarks And Performance Gates
 
+Release-shaped closeout verification:
+
+```bash
+cargo test --tests
+cargo test --test memory_ingest_slo -- --nocapture
+cargo bench --bench memory_ingest_latency --no-run
+```
+
+This sequence covers the full contract, integration, and unit surface, executes the published SLO gate, and confirms the benchmark target is buildable before rollout.
+
 ```bash
 cargo test --test memory_ingest_slo -- --nocapture
 cargo bench --bench memory_ingest_latency
