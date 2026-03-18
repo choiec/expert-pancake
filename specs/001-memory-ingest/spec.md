@@ -87,7 +87,7 @@ A Source Producer (e.g., learning platform backend) sends a document with metada
 
 **Acceptance Scenarios**:
 
-1. **Given** a valid canonical source document with title, summary, and external ID, **When** a POST request is sent to `/sources/register`, **Then** the system returns HTTP 201 with a list of normalized memory item URNs, an `indexing_status`, and source metadata echoed back with a server-assigned source ID.
+1. **Given** a valid canonical source document with title, summary, and external ID, **When** a POST request is sent to `/sources/register`, **Then** the system returns HTTP 201 with a list of normalized memory item URNs, an `indexing_status`, and source metadata echoed back with a deterministic UUID v5 source ID.
 2. **Given** a markdown source document with multiple heading sections, **When** registration completes, **Then** each section is normalized into a separate memory item with a relationship back to the source.
 3. **Given** a valid Open Badges or CLR payload, **When** registration completes, **Then** the authoritative source is stored with `document_type = json`, exactly one `json_document` memory item is created, and that memory item content matches the accepted UTF-8 request body exactly as stored.
 4. **Given** duplicate external IDs submitted with the same canonical payload semantics, **When** both registrations are processed, **Then** the second request receives the same authoritative identifiers and no duplicate memory items are created; if the normalized payload conflicts, the request fails with HTTP 409.
@@ -120,7 +120,7 @@ A Downstream Consumer queries for source metadata (registration timestamp, sourc
 
 **Acceptance Scenarios**:
 
-1. **Given** a registered source with a server-assigned source ID, **When** a GET request is sent to `/sources/{source-id}`, **Then** the system returns HTTP 200 with source metadata and an array of associated memory item URNs.
+1. **Given** a registered source with a deterministic UUID v5 source ID, **When** a GET request is sent to `/sources/{source-id}`, **Then** the system returns HTTP 200 with source metadata and an array of associated memory item URNs.
 2. **Given** a source with multiple memory items, **When** the source endpoint is queried, **Then** all memory items are present and ordered by ascending `sequence`.
 
 ---
@@ -205,7 +205,7 @@ The system maintains a search-friendly projection of memory items in Meilisearch
 
 ### Key Entities *(include if feature involves data)*
 
-- **Source**: Represents the external document being registered. Contains: source_id (UUID, server-assigned), external_id (string, unique, provided by client), title, summary (optional), document_type (`text`, `markdown`, or `json`), metadata (JSON, optional), created_at, updated_at. Minimum canonical ingest contract requires title, external_id, document_type, and content. Direct Open Badges and CLR ingest derive `document_type = json`, preserve the accepted UTF-8 request body exactly as authoritative content, and record ingest provenance in reserved system metadata. Every source in this slice links to one or more memory items via source_id.
+- **Source**: Represents the external document being registered. Contains: source_id (UUID v5, deterministically derived from the canonical source seed), external_id (string, unique, provided by client), title, summary (optional), document_type (`text`, `markdown`, or `json`), metadata (JSON, optional), created_at, updated_at. Minimum canonical ingest contract requires title, external_id, document_type, and content. Direct Open Badges and CLR ingest derive `document_type = json`, preserve the accepted UTF-8 request body exactly as authoritative content, and record ingest provenance in reserved system metadata. Every source in this slice links to one or more memory items via source_id.
 
 - **Memory Item**: Represents a normalized unit of content from a source. Contains: urn (URN, server-assigned, globally unique), source_id (FK to source), sequence (0-based integer, stable within source), unit_type (`paragraph`, `section`, `json_document`, or `metadata_placeholder`), start_offset (integer), end_offset (integer), version (string), content (string), content_hash (SHA-256 hash for deduplication), item_metadata (JSON, optional extension fields), created_at, updated_at. Offsets are 0-based UTF-8 byte offsets into the authoritative canonical content. Direct-standard ingest always produces exactly one `json_document` memory item whose content is the preserved accepted request body. Memory items are immutable after creation.
 

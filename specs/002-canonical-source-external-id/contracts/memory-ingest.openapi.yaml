@@ -1,0 +1,263 @@
+openapi: 3.1.0
+info:
+  title: Memory Ingest API
+  version: 0.2.0
+  summary: Planned contract for canonical source external-id governance.
+servers:
+  - url: http://127.0.0.1:3000
+paths:
+  /sources/register:
+    post:
+      summary: Register a source document and derive memory items.
+      description: >-
+        Canonical/manual ingest accepts only already-canonical external ids.
+        Direct-standard ingest derives a canonical project-owned external id,
+        preserves the original payload id as provenance metadata, and computes
+        replay semantics from canonical external identity plus semantic payload
+        hash.
+      operationId: registerSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CanonicalRegisterRequest'
+                - $ref: '#/components/schemas/OpenBadgesRegisterRequest'
+                - $ref: '#/components/schemas/ClrRegisterRequest'
+      responses:
+        '200':
+          description: Idempotent replay of an existing authoritative source.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterSourceResponse'
+        '201':
+          description: New source registered successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterSourceResponse'
+        '400':
+          description: Invalid canonical identity input or unmappable supported-standard payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Canonical external id already exists with a semantically different payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /sources/{source-id}:
+    get:
+      summary: Retrieve a source and all associated memory items.
+      operationId: getSource
+      parameters:
+        - name: source-id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Source found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceResponse'
+        '404':
+          description: Source not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    CanonicalRegisterRequest:
+      type: object
+      required:
+        - title
+        - external-id
+        - document-type
+        - content
+      properties:
+        title:
+          type: string
+          minLength: 1
+        summary:
+          type: string
+        external-id:
+          type: string
+          description: Canonical project-owned source URI.
+          pattern: '^https://api\\.cherry-pick\\.net/[a-z0-9]+/v[0-9]+p[0-9]+(?:p[0-9]+)?/[^:]+:.+$'
+          examples:
+            - https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01
+            - https://api.cherry-pick.net/qti/v3p0/kice.re.kr:20240621
+        document-type:
+          type: string
+          enum: [text, markdown]
+        content:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    OpenBadgesRegisterRequest:
+      type: object
+      required:
+        - '@context'
+        - type
+        - id
+        - name
+      properties:
+        '@context':
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        type:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        id:
+          type: string
+          description: Original standard payload identifier preserved as provenance only.
+        name:
+          type: string
+      additionalProperties: true
+    ClrRegisterRequest:
+      type: object
+      required:
+        - '@context'
+        - type
+        - id
+        - name
+      properties:
+        '@context':
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        type:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        id:
+          type: string
+          description: Original standard payload identifier preserved as provenance only.
+        name:
+          type: string
+      additionalProperties: true
+    RegisterSourceResponse:
+      type: object
+      required:
+        - source_id
+        - external_id
+        - document_type
+        - indexing_status
+        - memory_items
+      properties:
+        source_id:
+          type: string
+          format: uuid
+          description: Deterministic UUID v5 internal source identifier derived from the canonical source seed.
+        external_id:
+          type: string
+          description: Canonical project-owned source URI.
+          examples:
+            - https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Aexample%3Abadge%3A001
+        document_type:
+          type: string
+          enum: [text, markdown, json]
+        indexing_status:
+          type: string
+          enum: [queued, indexed, deferred]
+        memory_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MemoryItemSummary'
+    MemoryItemSummary:
+      type: object
+      required:
+        - urn
+        - sequence
+        - unit_type
+      properties:
+        urn:
+          type: string
+        sequence:
+          type: integer
+          minimum: 0
+        unit_type:
+          type: string
+    SourceResponse:
+      type: object
+      required:
+        - source_id
+        - external_id
+        - title
+        - document_type
+        - source_metadata
+        - memory_items
+      properties:
+        source_id:
+          type: string
+          format: uuid
+          description: Deterministic UUID v5 internal source identifier derived from the canonical source seed.
+        external_id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        document_type:
+          type: string
+          enum: [text, markdown, json]
+        source_metadata:
+          type: object
+          additionalProperties: true
+          properties:
+            system:
+              $ref: '#/components/schemas/SourceSystemMetadata'
+        memory_items:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    SourceSystemMetadata:
+      type: object
+      required:
+        - canonical_id_version
+        - ingest_kind
+        - semantic_payload_hash
+      properties:
+        canonical_id_version:
+          type: string
+          enum: [v1]
+        ingest_kind:
+          type: string
+          enum: [canonical, direct_standard]
+        original_standard_id:
+          type: string
+        semantic_payload_hash:
+          type: string
+        raw_body_hash:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+        - error_code
+        - message
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string

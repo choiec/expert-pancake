@@ -14,7 +14,7 @@ Represents the external document submitted for ingest after boundary validation 
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `source_id` | UUID | yes | Server-assigned immutable identifier |
+| `source_id` | UUID v5 | yes | Deterministic immutable identifier derived from the canonical source seed |
 | `external_id` | string | yes | Client-supplied unique idempotency key |
 | `title` | string | yes | Non-empty |
 | `summary` | string | no | Optional summary text |
@@ -25,6 +25,7 @@ Represents the external document submitted for ingest after boundary validation 
 
 #### Validation Rules
 
+- `source_id` must be deterministic for the same canonical source seed.
 - `external_id` must be globally unique.
 - `title` must be non-empty after trimming.
 - `document_type` must be `text`, `markdown`, or `json` in the canonical model.

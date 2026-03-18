@@ -16,12 +16,12 @@ That leaves four persistent problems:
 - the source system's original standard identifier is not clearly separated from the platform's canonical ingest identifier
 - the spec, contract, domain model, implementation, and tests can drift because they are not anchored to one explicit external identity grammar
 
-This feature is a follow-up amendment to `001-memory-ingest`. It tightens only the canonical source identity rules. It does not reopen the existing decisions that `source_id` remains a server UUID v4 and that memory item URNs remain deterministic UUID v5-derived identifiers.
+This feature is a follow-up amendment to `001-memory-ingest`. It standardizes canonical source identity rules and also requires `source_id` to be derived deterministically as UUID v5 from the canonical source seed for all rows, while memory item URNs remain deterministic UUID v5-derived identifiers.
 
 ## Relationship to 001-memory-ingest
 
 - This feature updates the meaning of canonical `external_id` introduced by `001-memory-ingest`.
-- This feature preserves the identifier-role separation established in `001-memory-ingest`: internal `source_id`, canonical `external_id`, and derived memory item URNs remain distinct.
+- This feature preserves the identifier-role separation established in `001-memory-ingest`: internal `source_id`, canonical `external_id`, and derived memory item URNs remain distinct, even though `source_id` is now deterministically derived.
 - This feature requires downstream alignment of the existing spec, contracts, domain language, and test fixtures from `001-memory-ingest` so that they no longer imply that a raw standard payload `id` is itself the canonical external identifier.
 
 ## Clarifications
@@ -32,12 +32,12 @@ This feature is a follow-up amendment to `001-memory-ingest`. It tightens only t
 - Q: Which `object_id` normalization policy should govern canonical identity? → A: Trim outer whitespace only, reject empty after trim, preserve internal spaces and case, preserve unreserved characters as-is, percent-encode spaces and reserved or non-unreserved characters using UTF-8 bytes, enforce length limits on both raw and normalized forms, and forbid destructive stripping or collapsing beyond outer trim.
 - Q: How should standard and version vocabulary be governed? → A: Store authoritative family and version vocabulary in a versioned repository artifact; persist only fixed canonical tokens such as `qti`, `cc`, `case`, `v3p0`, `v1p3`, and `v1p0`; allow future aliases only as input mappings and never persist them in canonical `external_id`.
 - Q: How should original standard identifiers be preserved and surfaced? → A: Fix the reserved provenance field as `source_metadata.system.original_standard_id`, keep `external_id` as the primary retrieval and display identifier, and expose `original_standard_id` only as secondary provenance when present.
-- Q: What replay/conflict and rollout policy should govern canonical identity adoption? → A: For new writes, decide replay or conflict by canonical `external_id` plus semantic payload hash, store both semantic and raw-body hashes with raw-body hash used only for audit and debug, preserve first-commit raw body behavior, grandfather legacy records unchanged, and enforce the canonical rule set first for new direct-standard ingest while leaving broader ingest-mode expansion for later planning.
+- Q: What replay/conflict and rollout policy should govern canonical identity adoption? → A: Decide replay or conflict by canonical `external_id` plus semantic payload hash, store both semantic and raw-body hashes with raw-body hash used only for audit and debug, preserve first-commit raw body behavior, derive `source_id` deterministically from the canonical source seed, and migrate all existing source rows to the same deterministic source-id rule as part of rollout.
 - Default decision: `object_id` maximum size is fixed at 256 UTF-8 bytes after outer trim for the raw form and 1024 ASCII characters for the percent-encoded normalized form; values exceeding either bound are rejected.
 - Default decision: current direct-standard family coverage remains the `001-memory-ingest` boundary profiles only, namely Open Badges AchievementCredential-style JSON and CLR credential-style JSON. Registry examples such as `qti`, `cc`, and `case` do not expand direct-standard support in this feature.
 - Default decision: for each supported direct-standard family, `standard` and `version` are resolved from the authoritative vocabulary registry entry pinned to that boundary profile; `object_id_raw` is taken from the top-level payload `id`; `object_id_normalized` follows the shared non-lossy encoding rule; and `source_domain` is derived first from a trusted issuer or publisher URL host present in payload metadata, otherwise from the authenticated or configured producer domain bound to the ingest context, otherwise the request is rejected.
 - Default decision: the authoritative vocabulary registry file is `specs/002-canonical-source-external-id/contracts/canonical-vocabulary.yaml`, and any registry change requires synchronized updates to spec examples, public contracts, normalization tests, and replay fixtures in the same change set.
-- Default decision: rollout for this feature ends after two concurrent write-path changes ship together for new writes only: canonical/manual ingest validates canonical `external_id` as submitted, and direct-standard ingest derives canonical `external_id` under the new rules. No additional ingest-mode expansion or legacy backfill is part of this feature; any future backfill must be proposed as a separate feature.
+- Default decision: rollout for this feature includes both write-path changes and mandatory migration of existing source rows so all stored `source_id` values follow the deterministic UUID v5 rule. Canonical/manual ingest validates canonical `external_id` as submitted, direct-standard ingest derives canonical `external_id` under the new rules, and legacy rows are rewritten to the same deterministic source-id regime in this feature.
 
 ## Goals
 
@@ -46,15 +46,13 @@ This feature is a follow-up amendment to `001-memory-ingest`. It tightens only t
 - **G3**: Make replay, idempotency, and conflict outcomes depend on canonical identity plus semantic payload equivalence rather than raw payload formatting.
 - **G4**: Introduce explicit versioning for canonical identifier grammar so future grammar changes can be governed without rewriting identifier roles.
 - **G5**: Align specification, contract, domain model, and regression tests around the same identifier semantics before implementation changes are made.
-- **G6**: State a clear backward-compatibility stance for records created under `001-memory-ingest`.
+- **G6**: Define a complete migration and rollback stance for rewriting all stored `source_id` values to deterministic UUID v5.
 
 ## Non-Goals
 
-- Changing `source_id` from server-generated UUID v4 to any deterministic or externally derived identifier.
 - Changing the existing memory item URN grammar or its deterministic UUID v5 behavior.
 - Adopting a destructive normalization rule that removes all special characters from `object_id`.
 - Expanding the set of direct-standard payload families beyond Open Badges and CLR, which are the only direct-standard families already in scope for `001-memory-ingest`.
-- Performing a mandatory backfill or rewrite of legacy `external_id` values created before this feature is implemented.
 
 ## Users & Actors
 
@@ -112,17 +110,17 @@ A standards integrator or operator inspects a registered source and can distingu
 
 ---
 
-### User Story 4 - Legacy Records Are Not Rewritten During Rollout (Priority: P3)
+### User Story 4 - Existing Records Are Migrated To Deterministic Source IDs (Priority: P2)
 
-A system operator rolls out the new canonical identity rules without forcing immediate migration of previously stored records.
+A system operator rolls out the new canonical identity rules and source-id derivation rules with a controlled migration so every stored source record ends up with a deterministic UUID v5 `source_id`.
 
-**Why this priority**: Rollout risk stays manageable only if this feature defines a clear compatibility boundary for old data.
+**Why this priority**: Eliminating UUID v4 usage requires a migration plan rather than a compatibility carve-out.
 
-**Independent Test**: Can be fully tested by reading legacy sources created before the feature and verifying they remain retrievable while new writes enforce the canonical grammar.
+**Independent Test**: Can be fully tested by migrating pre-feature rows, verifying their `source_id` values are rewritten to the deterministic UUID v5 rule, and confirming retrieval, replay, and foreign-key relationships remain consistent after migration.
 
 **Acceptance Scenarios**:
 
-1. **Given** a source created before this feature with a non-canonical `external_id`, **When** it is retrieved, **Then** the record remains readable without automatic identifier rewrite.
+1. **Given** a source created before this feature, **When** the migration runs, **Then** its `source_id` is rewritten to the deterministic UUID v5 value derived from the canonical source seed and all related rows continue to resolve correctly.
 2. **Given** a new registration after this feature is enabled, **When** the request provides a non-canonical manual `external_id` or a direct-standard mapping cannot produce a canonical URI, **Then** the write is rejected.
 
 ### Edge Cases
@@ -132,11 +130,12 @@ A system operator rolls out the new canonical identity rules without forcing imm
 - Two payloads differ only in case, percent-encoding, or punctuation that normalization rules explicitly preserve inside `object_id`; they must not collapse unless the documented normalization rules say they are equivalent.
 - An `object_id` contains reserved URI characters such as `/`, `?`, `#`, or spaces; the system must preserve identity through deterministic encoding rather than by dropping those characters.
 - A future grammar version is introduced after records already exist with `canonical_id_version = v1`; older records must remain interpretable under the version recorded with each source.
-- Legacy records created under `001-memory-ingest` use non-canonical `external_id` values; they remain readable, but new replay behavior for newly written records must not depend on rewriting those historic rows.
+- Migration must update all dependent foreign-key and projection references that currently use pre-feature `source_id` values.
 
 ### Identity & Canonicalization Constraints *(mandatory when identifiers are affected)*
 
 - The feature uses all three identifier roles and keeps them separate: internal `source_id`, canonical external `external_id`, and derived memory item URNs.
+- `source_id` MUST be derived as deterministic UUID v5 from a fixed project namespace and canonical source seed for all stored rows after this feature migrates existing data.
 - Canonical `external_id` MUST use the project-owned namespace and grammar `https://api.cherry-pick.net/{standard}/{version}/{source-domain}:{object-id}`.
 - The following examples are normative examples of valid canonical `external_id` values:
   - `https://api.cherry-pick.net/qti/v3p0/kice.re.kr:20240621`
@@ -165,21 +164,22 @@ A system operator rolls out the new canonical identity rules without forcing imm
 - **FR-007**: Direct-standard ingest MUST stop persisting the payload `id` directly as canonical `external_id`. Instead, it MUST construct canonical `external_id` from the resolved `standard`, `version`, `source-domain`, and `object_id`, preserve the original standard `id` separately, and reject the request if any canonical component cannot be determined confidently. In this feature, direct-standard ingest support remains limited to Open Badges AchievementCredential-style and CLR credential-style JSON payloads inherited from `001-memory-ingest`. For each supported family, `standard` and `version` MUST come from the vocabulary-registry entry pinned to that boundary profile, `object_id_raw` MUST come from the top-level payload `id`, and `source_domain` MUST come from a trusted issuer or publisher URL host in payload metadata or from the configured producer domain bound to the ingest context; otherwise the request MUST be rejected.
 - **FR-008**: Canonical/manual ingest MUST continue to accept a caller-supplied `external_id`, but only when that value already matches the canonical URI grammar and the supplied identifier is consistent with the request's declared or implied source context.
 - **FR-009**: Replay and idempotency semantics MUST use the persisted canonical `external_id` together with the canonical semantic payload hash. A repeated request with the same canonical `external_id` and equivalent semantic payload MUST return the existing authoritative identifiers even if the raw payload `id` spelling or raw-body formatting differs; a repeated request with the same canonical `external_id` and a semantically different payload MUST fail as a conflict.
-- **FR-010**: The feature MUST preserve backward compatibility by leaving previously stored non-canonical `external_id` values untouched. Existing records remain readable and are grandfathered without automatic migration, backfill, or identifier rewrite. Replay and conflict rules introduced by this feature govern new writes within the rollout scope rather than depending on legacy-row normalization. No optional legacy backfill is part of this feature; any future backfill proposal requires a separate spec, plan, and audit strategy.
+- **FR-010**: The feature MUST migrate previously stored source rows so all persisted `source_id` values become deterministic UUID v5 values derived from the canonical source seed. The migration MUST update all dependent authoritative and projection records that reference `source_id`, and it MUST fail safely rather than leaving mixed v4/v5 source identity in persistent state.
 - **FR-011**: Public contracts and product-facing documentation MUST be updated so they no longer imply that direct-standard payload `id` is the canonical external identifier. Registration, retrieval, and source metadata contracts must show the canonical URI in `external_id` as the primary identity and the preserved raw standard identifier in `source_metadata.system.original_standard_id` as reserved provenance metadata where applicable.
 - **FR-012**: The follow-up changes to spec, contracts, tests, and domain language MUST use aligned canonical examples and terminology for grammar, provenance, replay, and conflict semantics. At minimum, the updated artifact set must cover OpenAPI, contract tests, replay and conflict integration tests, normalization edge cases, and domain model descriptions.
-- **FR-013**: The feature MUST explicitly preserve the existing identifier-role boundaries from `001-memory-ingest`: `source_id` remains a server UUID v4, memory item URNs remain deterministic derived identifiers, and neither role may be replaced by canonical `external_id`.
+- **FR-013**: The feature MUST explicitly preserve identifier-role boundaries: `source_id` is an internal deterministic UUID v5 derived from the canonical source seed, memory item URNs remain deterministic derived identifiers, and neither role may be replaced by canonical `external_id`.
 
 ### Non-Functional Constraints
 
 - Canonicalization must be deterministic, documented, and versioned so the same valid input always produces the same canonical `external_id` under the same `canonical_id_version`.
 - Provenance must remain auditable: the system must make it possible to tell which grammar version produced the canonical URI and what original standard identifier, if any, was preserved.
 - Validation failures for invalid canonical identity inputs must fail fast before authoritative state is created.
-- Compatibility risk must be bounded by a no-forced-migration rollout posture for legacy rows.
+- Migration risk must be bounded by an explicit, validated rewrite plan for all persisted `source_id` references.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Canonical Source Identifier**: The authoritative external identity for a source, stored in `external_id` as a project-owned URI composed of `standard`, `version`, `source-domain`, and `object_id`.
+- **Deterministic Source Identifier**: The internal `source_id` for all stored rows after migration, derived as UUID v5 from a fixed project namespace and canonical source seed so repeated registration of the same canonical source yields the same internal identifier.
 - **Source Identity Provenance**: Reserved server-managed metadata describing how canonical identity was formed, including `canonical_id_version`, `ingest_kind`, `source_metadata.system.original_standard_id` when the source originated from a standard payload, semantic payload hash, and any audit-only raw-body hash fields.
 - **Canonical Vocabulary Registry**: The versioned authoritative artifact that lists the allowed standard-family codes, version tokens, and any accepted input aliases that normalize to those persisted canonical values.
 - **Canonicalization Component Set**: The validated identity components used to build or validate `external_id`, including normalized standard family, normalized version, trusted source domain, and encoded object identifier.
@@ -197,7 +197,7 @@ A system operator rolls out the new canonical identity rules without forcing imm
 - **AC-004**: Formatting-only replays and raw-ID representation differences that normalize to the same canonical source identity do not create duplicate authoritative records.
 - **AC-005**: Semantic payload changes for the same canonical `external_id` are rejected as conflicts.
 - **AC-006**: Source retrieval surfaces the canonical `external_id`, `canonical_id_version`, and direct-standard provenance fields without collapsing them into one identifier.
-- **AC-007**: Legacy records created before this feature remain retrievable without automatic rewrite, while new writes enforce the canonical grammar.
+- **AC-007**: Existing records are migrated so every persisted `source_id` follows the deterministic UUID v5 rule, and retrieval plus replay behavior remains correct after the rewrite.
 - **AC-008**: Updated contracts, regression tests, and product documentation use the same identifier meaning and no longer assert that payload `id` equals canonical `external_id`.
 
 ### Assumptions / Open Questions
@@ -206,7 +206,7 @@ A system operator rolls out the new canonical identity rules without forcing imm
 - Retrieval and display may still show provenance details for operators, but this feature now fixes the identity precedence: canonical `external_id` first, original standard `id` second.
 - Different raw payload identifiers or raw-body formatting do not by themselves define conflict; semantic payload difference under the same canonical identity does.
 - Current direct-standard family scope remains Open Badges and CLR from `001-memory-ingest`; registry examples such as `qti`, `cc`, and `case` remain valid canonical vocabulary examples without expanding direct-standard ingest scope here.
-- This feature's rollout is complete once canonical/manual validation and direct-standard derivation rules ship together for new writes; any later ingest-mode expansion or backfill is explicitly out of scope for this spec.
+- This feature's rollout is complete only after canonical/manual validation, direct-standard derivation rules, and mandatory source-id migration all ship together; later ingest-mode expansion remains out of scope.
 
 ## Success Criteria *(mandatory)*
 

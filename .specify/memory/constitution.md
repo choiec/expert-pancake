@@ -1,14 +1,12 @@
 <!--
 Sync Impact Report:
-- Version change: 1.0.0 → 1.1.0
+- Version change: 1.1.0 → 2.0.0
 - Modified principles:
-  - 2. Architecture Boundaries (expanded to preserve identifier-role separation across layers)
-  - 3. Identifier Governance & Canonicalization (new)
-  - 5. Testing Discipline (expanded for identifier grammar alignment)
-  - 8. Documentation & Runbooks (expanded for canonicalization governance)
-  - Definition of Done (expanded for cross-artifact identifier alignment)
-  - Non‑Negotiables (expanded for canonical identity guardrails)
-  - Governance (expanded for versioned identifier-rule review)
+  - 3. Identifier Governance & Canonicalization (deterministic UUID v5 source_id required)
+  - 5. Testing Discipline (expanded for source_id derivation and migration alignment)
+  - Definition of Done (expanded for source_id migration alignment)
+  - Non‑Negotiables (expanded for deterministic source_id guardrails)
+  - Governance (expanded for source-id seed and migration review)
 - Added sections: None
 - Removed sections: None
 - Templates requiring updates:
@@ -19,7 +17,7 @@ Sync Impact Report:
   - ✅ specs/001-memory-ingest/quickstart.md
   - ⚠ pending review skipped: .specify/templates/commands/ (directory absent)
 - Follow-up TODOs:
-  - Refresh the active memory-ingest spec, plan, contracts, tests, and implementation artifacts for canonical external_id governance before any identifier-behavior change is implemented.
+  - Refresh active source-ingest specs, plans, contracts, tests, and implementation artifacts for deterministic source_id plus canonical external_id governance before code changes are approved.
 -->
 
 # Rust AI Memory Architecture Constitution
@@ -49,9 +47,10 @@ Non‑functional goals:
 ### 3. Identifier Governance & Canonicalization
 - **Canonical external identity**: Canonical source identity must be represented as a stable URI under the project-owned namespace rooted at `https://api.cherry-pick.net/...`. Project governance owns that namespace and its grammar.
 - **Role separation**:
-  - `source_id` is the internal server-generated identifier. It must remain distinct from `external_id`, and this constitution amendment does not authorize converting `source_id` to UUID v5 or any externally derived identifier.
+  - `source_id` is the internal deterministic identifier. It must remain distinct from `external_id`, and all persisted source rows must use a UUID v5 derived from a project-governed canonical source seed and fixed namespace.
   - `external_id` is the canonical external identifier used for reconciliation, replay classification, and idempotency. It must persist the canonical URI, not a raw third-party identifier.
   - `memory item URN` is the deterministic immutable identifier for normalized memory items. This amendment does not change memory-item URN generation rules.
+- **Source-id derivation**: Deterministic `source_id` generation must be explicit, documented, and based on canonical source identity inputs only. Mutable raw-body formatting, non-canonical aliases, transport metadata, or ambiguous provenance fields must never participate in the UUID v5 seed.
 - **Canonicalization rules**: Canonicalization must be explicit, deterministic, documented, and versioned. Server-managed metadata must record the applied `canonical_id_version` or an equivalently documented authoritative field.
 - **Source domain normalization**: Canonical URI generation must normalize source-domain inputs through validation, case/format normalization, and deterministic encoding under the project-owned namespace. Unowned or ambiguous domains must be rejected rather than silently rewritten.
 - **Object identifier normalization**: Object identity components must preserve semantic information through validation and encoding. Destructive character stripping, lossy collapsing, or aggressive sanitization that can merge distinct identifiers is prohibited.
@@ -71,7 +70,7 @@ Rationale: The existing architecture already separates internal UUIDs, external 
 - **Unit vs integration vs contract**: Unit tests validate isolated logic; integration tests validate end‑to‑end behavior across module boundaries; contract tests validate external API contracts (HTTP/GraphQL/Storage) and adapters.
 - **Storage adapter verification**: Each storage adapter (SurrealDB, FalkorDB, Meilisearch) must have a suite of contract tests that verify the adapter meets its declared guarantees (e.g., schema expectations, indexing behavior, query semantics).
 - **API contract tests**: Public API surfaces (Axum routes, external integrations) must have automated contract tests asserting request/response shape, status codes, and error semantics.
-- **Identifier-governance verification**: Any change to canonical identifier grammar, replay/conflict semantics, or direct-standard identifier preservation must update and pass aligned spec examples, API/storage contracts, replay tests, provenance tests, and normalization edge-case coverage.
+- **Identifier-governance verification**: Any change to canonical identifier grammar, deterministic `source_id` derivation, replay/conflict semantics, or direct-standard identifier preservation must update and pass aligned spec examples, API/storage contracts, replay tests, provenance tests, normalization edge-case coverage, and migration verification.
 - **Test data hygiene**: Tests must avoid flaky global state by using isolated fixtures, in‑memory instances, or disposable test databases.
 
 ### 6. Performance & Operational Principles
@@ -99,7 +98,7 @@ A change is done when all of the following are true:
 - Code is reviewed and approved via the repository’s standard PR process.
 - Documentation is updated (spec, plan, tasks, README, ADRs) for the change.
 - Performance regressions have been evaluated for non‑trivial changes affecting runtime behavior.
-- Changes that affect canonical identifiers, normalization grammar, or replay/conflict semantics update the relevant spec, plan, contracts, tests, and implementation artifacts together.
+- Changes that affect canonical identifiers, deterministic `source_id` derivation, normalization grammar, or replay/conflict semantics update the relevant spec, plan, contracts, tests, migration artifacts, and implementation artifacts together.
 - Dependencies are updated responsibly (no unchecked upgrades that bypass review).
 
 ## Non‑Negotiables
@@ -108,7 +107,7 @@ A change is done when all of the following are true:
 - No shortcut around the established handler/service/repository boundary.
 - No canonical external identifier may be stored outside the project-owned URI namespace once a canonicalization rule applies.
 - No destructive identifier normalization policy may strip characters until distinct source identities collapse.
-- No change may replace `source_id` with an externally derived identifier or alter memory-item URN generation through this governance amendment.
+- No change may collapse `source_id` and `external_id` into one field, use non-canonical or mutable seed material for deterministic `source_id`, or alter memory-item URN generation without synchronized artifact review.
 - Security and privacy expectations are enforced by default; exceptions require explicit documented risk acceptance.
 
 ## Governance
@@ -116,7 +115,7 @@ This constitution is the authoritative source for project governance. Every chan
 
 - **Amendments**: Amendments require a documented rationale, a PR with changes to this constitution, and approval by the project maintainers.
 - **Versioning**: Governance versions follow semantic versioning: major bumps for breaking governance changes, minor for new principles or policy expansions, patch for clarifications.
-- **Identifier-rule changes**: Any amendment that changes canonical identifier grammar, namespace ownership, replay/conflict semantics, or provenance retention rules must include synchronized review of the relevant spec, plan, contracts, tests, and implementation backlog before code changes are approved.
+- **Identifier-rule changes**: Any amendment that changes canonical identifier grammar, namespace ownership, deterministic `source_id` seed rules, replay/conflict semantics, provenance retention rules, or legacy-row migration posture must include synchronized review of the relevant spec, plan, contracts, tests, migration strategy, and implementation backlog before code changes are approved.
 - **Compliance review**: Every PR should include a short statement describing how it complies with the relevant constitution principles; reviewers should verify compliance.
 
-**Version**: 1.1.0 | **Ratified**: 2026-03-17 | **Last Amended**: 2026-03-18
+**Version**: 2.0.0 | **Ratified**: 2026-03-17 | **Last Amended**: 2026-03-18
