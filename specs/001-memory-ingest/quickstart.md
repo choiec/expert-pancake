@@ -1,18 +1,20 @@
 # Quickstart: Memory Ingest Vertical Slice
 
-**Status**: IMPLEMENT-READY
+**Status**: IMPLEMENTED
 
 ## Purpose
 
-This document describes the local development flow for the Rust + Axum + SurrealDB + Meilisearch memory-ingest slice.
+This document describes the current local development and operator workflow for the Rust + Axum + SurrealDB + Meilisearch memory-ingest slice.
 
 ## Prerequisites
 
 - Rust stable toolchain with edition 2024 support
-- Docker and Docker Compose or equivalent local containers
+- Docker and Docker Compose
 - `curl` for HTTP checks
 
-## Proposed Environment Variables
+## Environment Variables
+
+Required:
 
 ```bash
 export APP_LISTEN_ADDR=127.0.0.1:3000
@@ -26,19 +28,21 @@ export MEILI_MASTER_KEY=local-dev-key
 export MEMORY_INGEST_ENABLED=true
 ```
 
-## Start Infrastructure
+Optional:
 
-If `docker-compose.yaml` is updated for this slice, the intended command is:
+```bash
+export SURREALDB_CONNECT_TIMEOUT_MS=5000
+export SURREALDB_READY_TIMEOUT_MS=1000
+export MEILI_CONNECT_TIMEOUT_MS=5000
+export MEILI_READY_TIMEOUT_MS=1000
+export MEMORY_MAX_REQUEST_BODY_BYTES=10485760
+export MEMORY_NORMALIZATION_TIMEOUT_SECS=30
+```
+
+## Start Infrastructure
 
 ```bash
 docker compose up -d surrealdb meilisearch
-```
-
-Until that file is populated, equivalent local containers are:
-
-```bash
-docker run -d --name surrealdb -p 8000:8000 surrealdb/surrealdb:latest start --log trace --user root --pass root memory
-docker run -d --name meilisearch -p 7700:7700 -e MEILI_MASTER_KEY=local-dev-key getmeili/meilisearch:v1.13
 ```
 
 ## Run the Service
@@ -47,12 +51,21 @@ docker run -d --name meilisearch -p 7700:7700 -e MEILI_MASTER_KEY=local-dev-key 
 cargo run -p app_server
 ```
 
-Expected behavior after implementation:
+## Smoke Test: Health And Readiness
 
-- `GET /health` returns `200` from a local-only liveness check without calling SurrealDB or Meilisearch
-- `GET /ready` returns `200` only when SurrealDB write-path checks succeed and returns `503` when the authoritative write path is unavailable; search degradation appears in the response body without failing readiness when the database remains ready
+```bash
+curl -i http://127.0.0.1:3000/health
+curl -i http://127.0.0.1:3000/ready
+```
 
-## Smoke Test: Canonical Ingest
+Expected behavior:
+
+- `/health` returns `200` without probing SurrealDB or Meilisearch.
+- `/ready` returns `200` only when the SurrealDB write path is ready.
+- `/ready` returns `503` when SurrealDB is unavailable.
+- Search degradation is reported in the `/ready` body while authoritative write readiness remains `200`.
+
+## Smoke Test: Canonical Registration
 
 ```bash
 curl -i http://127.0.0.1:3000/sources/register \
@@ -68,27 +81,14 @@ curl -i http://127.0.0.1:3000/sources/register \
   }'
 ```
 
-Expected response shape:
+Expected registration semantics:
 
-- `201 Created` for a first ingest
-- `200 OK` for an idempotent replay with the same canonical payload
-- `409 Conflict` for the same `external-id` with conflicting canonical content
-- `indexing_status` returns only `queued`, `indexed`, or `deferred`
+- First ingest returns `201 Created`.
+- Idempotent replay returns `200 OK` with the same `source_id` and `memory_items`.
+- Conflicting replay returns `409 Conflict`.
+- Public `indexing_status` is only `queued`, `indexed`, or `deferred`.
 
-## Direct Standard Ingest Semantics
-
-- Accepted Open Badges and CLR payloads are stored with authoritative `document_type = json`.
-- The accepted UTF-8 request body is preserved exactly as stored content and emitted through one derived `json_document` memory item.
-- Formatting-only replay of the same validated standard payload reuses the first authoritative record because replay detection uses normalized JSON hashing rather than raw-body bytes.
-
-## Implementation Verification Checkpoints
-
-- **Standard-payload validation**: verify that accepted, schema-invalid, and shape-valid-but-unmappable Open Badges and CLR fixtures produce the documented `201` or `200` versus `400` outcomes and leave no authoritative state on rejection.
-- **Replay hashing**: verify that formatting-only variants of the same validated standard payload return the same `source_id` and URNs while retrieval still returns the preserved first-commit request body exactly as stored.
-- **Outbox mapping**: verify that a successful registration creates durable indexing work tied to authoritative identifiers and that external responses summarize indexing progress only as `queued`, `indexed`, or `deferred`.
-- **Performance gates**: verify that the benchmark or load suite asserts the published latency and throughput thresholds before staging or rollout.
-
-## Smoke Test: Open Badges / CLR Direct Ingest
+## Smoke Test: Direct Open Badges Or CLR Registration
 
 ```bash
 curl -i http://127.0.0.1:3000/sources/register \
@@ -102,88 +102,101 @@ curl -i http://127.0.0.1:3000/sources/register \
   }'
 ```
 
-Expected behavior:
+Direct-standard contract guarantees:
 
-- `201 Created` with `document_type: json`
-- exactly one returned memory item with `unit_type: json_document`
-- `indexing_status: queued` when the outbox accepts work but search confirmation is still pending
-- `indexing_status: deferred` when Meilisearch is unavailable but authoritative persistence succeeds
+- Accepted payloads are persisted as canonical `document_type = json`.
+- Exactly one `json_document` memory item is created.
+- The first committed UTF-8 request body is the authoritative retrieval payload.
+- Formatting-only replay reuses the same authoritative identifiers because replay hashing uses normalized JSON, not raw-body bytes.
 
-## Smoke Test: Retrieval
+## Smoke Test: Authoritative Retrieval
 
 ```bash
 curl -i http://127.0.0.1:3000/sources/{source_id}
 curl -i http://127.0.0.1:3000/memory-items/{urn}
 ```
 
+The source response returns memory items ordered by ascending `sequence`. Retrieval is authoritative and should be used to validate direct-standard preserved content and source ordering.
+
 ## Smoke Test: Search
 
 ```bash
-curl -i 'http://127.0.0.1:3000/search/memory-items?q=hello&limit=10'
-```
-
-Expected behavior:
-
-- `200 OK` with search projection hits if Meilisearch is healthy and indexing completed
-- `503 Service Unavailable` with structured error if search is unavailable while retrieval remains operational
-
-Use a document-type filter to validate direct-standard projection behavior explicitly:
-
-```bash
+curl -i 'http://127.0.0.1:3000/search/memory-items?q=hello&limit=10&offset=0'
 curl -i 'http://127.0.0.1:3000/search/memory-items?q=Rust&document-type=json&limit=10&offset=0'
 ```
 
 Expected behavior:
 
-- only projection hits are returned
-- each hit contains `urn`, `source_id`, `sequence`, `document_type`, `content_preview`, and optional `score`
-- no authoritative `content` field is returned from the search endpoint
+- `200 OK` with projection hits if Meilisearch is healthy and indexing completed.
+- `503 SEARCH_UNAVAILABLE` if Meilisearch is unavailable.
+- Search responses never include authoritative `content`.
 
-## Operational Validation Notes
+## Degraded Search Exercise
 
-- Indexing backlog inspection is performed against the authoritative `memory_index_job` outbox records in SurrealDB. Operators should be able to distinguish `pending`, `retryable`, and `dead_letter` jobs.
-- Public API responses summarize those internal job states as `queued`, `indexed`, or `deferred`; internal outbox vocabulary is never returned directly to clients.
-- Retry exhaustion must promote jobs to `dead_letter` without affecting authoritative source or memory-item availability.
-- Manual recovery must support re-indexing from authoritative SurrealDB data by replaying source identifiers from the outbox rather than depending on stale Meilisearch state.
-- Performance validation is part of operational readiness for this slice: emitted metrics and benchmark or load reports must be retained as evidence that AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, and NC-004 were checked.
+1. Stop or block Meilisearch while keeping SurrealDB available.
+2. Register a new source.
+3. Confirm registration still succeeds and `indexing_status` is `deferred`.
+4. Confirm `GET /search/memory-items` returns `503`.
+5. Confirm `GET /sources/{source_id}` and `GET /memory-items/{urn}` still succeed.
+
+## Verification Checkpoints
+
+- **Standard-payload validation**: accepted, schema-invalid, and shape-valid-but-unmappable fixtures must match the published `201` or `200` versus `400` outcomes.
+- **Replay hashing**: formatting-only variants must reuse authoritative identifiers and preserve first-commit retrieval content.
+- **Outbox mapping**: committed outbox rows must rehydrate projection documents from `memory_source` and `memory_item` without semantic loss.
+- **Public status translation**: only `queued`, `indexed`, or `deferred` can appear through the public API even when internal outbox state is `pending`, `processing`, `retryable`, `completed`, or `dead_letter`.
+- **Performance gates**: the benchmark and SLO suite must emit p95/p99 latency, throughput, and error-rate evidence for canonical registration, direct-standard registration, 10k-item source retrieval, and search projection queries.
 
 ## Operator Queries
 
 Inspect the authoritative outbox backlog:
 
 ```sql
-SELECT source_id, status, retry_count, last_error, available_at, created_at, updated_at
+SELECT job_id, source_id, status, retry_count, last_error, available_at, created_at, updated_at
 FROM memory_index_job
 ORDER BY available_at ASC, created_at ASC;
 ```
 
-Inspect only exhausted jobs:
+Inspect authoritative rows for a single source:
 
 ```sql
-SELECT source_id, status, retry_count, last_error, updated_at
+SELECT * FROM memory_source WHERE source_id = <uuid>;
+SELECT * FROM memory_item WHERE source_id = <uuid> ORDER BY sequence ASC;
+SELECT * FROM memory_index_job WHERE source_id = <uuid> ORDER BY created_at ASC;
+```
+
+Inspect dead-letter rows:
+
+```sql
+SELECT job_id, source_id, retry_count, last_error, updated_at
 FROM memory_index_job
 WHERE status = 'dead_letter'
 ORDER BY updated_at DESC;
 ```
 
-Requeue dead-letter jobs for manual recovery after search remediation:
+Requeue retryable or dead-letter rows after Meilisearch remediation:
 
 ```sql
 UPDATE memory_index_job
 SET status = 'retryable', retry_count = 0, last_error = NONE, available_at = time::now(), updated_at = time::now()
-WHERE status = 'dead_letter';
+WHERE status IN ['retryable', 'dead_letter'];
 ```
+
+Supported recovery guidance for this slice:
+
+1. Treat `memory_source` and `memory_item` as authoritative.
+2. Validate those rows before taking any recovery action.
+3. Rebuild `memory_items_v1` only by requeueing durable `memory_index_job` rows keyed by authoritative `source_id`.
+4. Never use stale Meilisearch documents as recovery input.
 
 ## Benchmarks And Performance Gates
 
-Build and run the owned performance validation:
-
 ```bash
-cargo test --test memory_ingest_slo
+cargo test --test memory_ingest_slo -- --nocapture
 cargo bench --bench memory_ingest_latency
 ```
 
-The performance test asserts p95 and p99 thresholds for registration, retrieval, and search. The benchmark prints a reproducible report and Prometheus-compatible histogram output from the in-process metrics pipeline.
+The SLO suite asserts the published pass/fail latency gates. The benchmark prints p95/p99 latency, throughput, error rate, and the Prometheus histogram snapshot for the same scenarios.
 
 ## Suggested Local Validation Sequence
 
@@ -191,13 +204,13 @@ The performance test asserts p95 and p99 thresholds for registration, retrieval,
 2. Run the Axum service.
 3. Confirm `/health` and `/ready` behavior.
 4. Register a canonical markdown source.
-5. Retrieve the new source and one derived memory item.
-6. Confirm Meilisearch receives the projection and search returns the item.
-7. Replay the same ingest request and verify idempotent identifiers are returned.
-8. Submit a conflicting payload with the same `external-id` and verify `409 Conflict`.
-9. Register one Open Badges payload and one CLR payload, then verify each returns `document_type = json`, one `json_document` item, and exact-content retrieval.
-10. Submit one schema-invalid standard payload and one shape-valid-but-unmappable standard payload and verify both return `400` without persistence.
-11. Replay a formatting-only variant of a successful direct-standard payload and verify the same authoritative identifiers are returned while retrieval still exposes the first committed body.
-12. Inspect the corresponding authoritative outbox state and verify public `indexing_status` remains limited to `queued`, `indexed`, or `deferred`.
-13. Confirm `/health` stays `200` when dependencies are down while `/ready` reflects authoritative write-path availability.
-14. Run the benchmark/load suite and confirm the emitted p95/p99 metrics satisfy AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, and NC-004 before staging rollout.
+5. Retrieve the source and one memory item.
+6. Confirm ordered source retrieval and authoritative preserved content.
+7. Confirm Meilisearch receives the projection and search returns the item.
+8. Replay the same ingest request and verify idempotent identifiers.
+9. Submit a conflicting payload with the same `external-id` and verify `409 Conflict`.
+10. Register Open Badges and CLR payloads and verify each returns `document_type = json` plus one `json_document` item.
+11. Replay a formatting-only standard payload and verify retrieval still returns the first committed body.
+12. Inspect the authoritative outbox row for the same `source_id` and confirm public `indexing_status` stays limited to `queued`, `indexed`, or `deferred`.
+13. Exercise degraded search behavior.
+14. Run the SLO suite and benchmark before staging rollout.

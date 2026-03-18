@@ -331,7 +331,7 @@ Traceability: US3; G4; FR-006; FR-007.
 
 ### Tests for User Story 4
 
-- [ ] T026 [P] [US4] Add OpenAPI-backed contract validation for GET /search/memory-items in tests/contract/search_memory_items_contract.rs
+- [X] T026 [P] [US4] Add OpenAPI-backed contract validation for GET /search/memory-items in tests/contract/search_memory_items_contract.rs
 Outcome: Query parameters, result shape, and degraded-search error behavior are pinned to the contract.
 Dependencies: T008.
 Relevant inputs: contracts/memory-ingest.openapi.yaml `/search/memory-items`; spec.md FR-008, FR-009.
@@ -339,7 +339,7 @@ Constraints: Contract coverage must include filters for `source-id`, `document-t
 Done-when: Contract tests fail until the endpoint returns `SearchResponse` projection hits or structured `503` for unavailable search.
 Traceability: US4; FR-008; FR-009.
 
-- [ ] T027 [P] [US4] Add integration coverage for indexing success and degraded search in tests/integration/search_projection_flow.rs
+- [X] T027 [P] [US4] Add integration coverage for indexing success and degraded search in tests/integration/search_projection_flow.rs
 Outcome: The projection pipeline is specified for both healthy indexing and Meilisearch-unavailable scenarios.
 Dependencies: T017.
 Relevant inputs: spec.md User Story 4 acceptance scenarios; edge case `Search projection failures`; research.md Decision 8.
@@ -347,7 +347,7 @@ Constraints: Registration must still succeed when search is unavailable; the tes
 Done-when: Integration tests contain failing assertions for searchable projection hits, direct-standard search projections, and degraded `503` search behavior.
 Traceability: US4; AC-F5; AC-R2; NC-007.
 
-- [ ] T037 [P] [US4] Add Meilisearch storage-adapter contract coverage in tests/contract/meilisearch_projection_contract.rs
+- [X] T037 [P] [US4] Add Meilisearch storage-adapter contract coverage in tests/contract/meilisearch_projection_contract.rs
 Outcome: The non-authoritative search adapter's projection guarantees are pinned to the published slice semantics.
 Dependencies: T007.
 Relevant inputs: constitution Storage adapter verification; plan.md Storage adapter contract tests; spec.md FR-008, FR-009.
@@ -357,7 +357,7 @@ Traceability: US4; FR-008; FR-009; constitution Storage adapter verification.
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Implement the Meilisearch indexing adapter and index settings bootstrap in crates/core_infra/src/meilisearch.rs and crates/mod_memory/src/infra/meili_indexer.rs
+- [X] T028 [US4] Implement the Meilisearch indexing adapter and index settings bootstrap in crates/core_infra/src/meilisearch.rs and crates/mod_memory/src/infra/meili_indexer.rs
 Outcome: Canonical memory items can be translated into `memory_items_v1` projection documents with idempotent index settings.
 Dependencies: T007, T013, T015.
 Relevant inputs: data-model.md Search Projection; plan.md Indexing Adapter; spec.md FR-008.
@@ -365,7 +365,7 @@ Constraints: The adapter must remain non-authoritative and prepare content previ
 Done-when: A concrete adapter can upsert projection documents and configure index settings for search/filter/sort behavior.
 Traceability: US4; FR-008; research.md Decision 7.
 
-- [ ] T029 [US4] Implement the outbox-driven indexing worker and startup hook in crates/mod_memory/src/application/index_memory_items.rs, crates/app_server/src/main.rs, crates/app_server/src/state.rs
+- [X] T029 [US4] Implement the outbox-driven indexing worker and startup hook in crates/mod_memory/src/application/index_memory_items.rs, crates/app_server/src/main.rs, crates/app_server/src/state.rs
 Outcome: Background processing can consume durable indexing jobs, invoke the Meilisearch adapter, and mark success or retryable/dead-letter states.
 Dependencies: T005, T015, T028.
 Relevant inputs: data-model.md MemoryIndexJob lifecycle; plan.md Background indexing worker; research.md Decision 7.
@@ -373,7 +373,7 @@ Constraints: Worker failures must never roll back authoritative writes; retries 
 Done-when: App bootstrap starts a background worker that can process queued indexing jobs from the outbox lifecycle, promote exhausted retries to `dead_letter`, preserve authoritative backlog visibility, and map internal job states to external `queued`/`indexed`/`deferred` responses without leaking internal vocabulary.
 Traceability: US4; FR-008; NC-007; constitution Indexing vs query separation.
 
-- [ ] T030 [US4] Implement SearchMemoryItemsService and the search endpoint in crates/mod_memory/src/application/search_memory_items.rs, crates/app_server/src/handlers/search_memory_items.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
+- [X] T030 [US4] Implement SearchMemoryItemsService and the search endpoint in crates/mod_memory/src/application/search_memory_items.rs, crates/app_server/src/handlers/search_memory_items.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
 Outcome: `GET /search/memory-items` exposes Meilisearch-backed query, filtering, pagination, and degraded-search error mapping.
 Dependencies: T006, T028, T029.
 Relevant inputs: contracts/memory-ingest.openapi.yaml `/search/memory-items`; plan.md SearchMemoryItemsService; spec.md FR-009.
@@ -397,7 +397,7 @@ Constraints: Instrument all public endpoints, use the histogram buckets defined 
 Done-when: The runtime exposes the latency measurements needed to calculate p95/p99 for all public endpoints using the configured histogram buckets and can segment registration metrics by canonical versus direct-standard ingest.
 Traceability: FR-013; NC-009; constitution Observability.
 
-- [ ] T039 [P] Add observability validation for trace propagation and latency metrics in tests/integration/observability_tracing_flow.rs and tests/integration/observability_metrics.rs
+- [X] T039 [P] Add observability validation for trace propagation and latency metrics in tests/integration/observability_tracing_flow.rs and tests/integration/observability_metrics.rs
 Outcome: The required request tracing and latency observability guarantees are verified end-to-end.
 Dependencies: T017, T021, T025, T030, T038.
 Relevant inputs: spec.md FR-013, NC-009; plan.md Testing / Validation Strategy.
@@ -405,7 +405,7 @@ Constraints: Assert W3C trace-context propagation, span/trace coverage for regis
 Done-when: Integration tests fail until trace propagation and metrics behavior satisfy the published observability requirements for canonical and direct-standard ingest paths.
 Traceability: FR-013; NC-009; constitution API contract tests.
 
-- [ ] T044 [P] Add benchmark and load-validation coverage for registration, retrieval, and search in benches/memory_ingest_latency.rs, tests/perf/memory_ingest_slo.rs, and tests/fixtures/perf/*.json
+- [X] T044 [P] Add benchmark and load-validation coverage for registration, retrieval, and search in benches/memory_ingest_latency.rs, tests/perf/memory_ingest_slo.rs, and tests/fixtures/perf/*.json
 Outcome: The feature has an executable performance validation plan tied to the published p95/p99 goals before implementation is declared complete.
 Dependencies: T017, T021, T025, T030, T038.
 Relevant inputs: spec.md AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, NC-004; plan.md Performance validation strategy; quickstart.md Suggested Local Validation Sequence.
@@ -421,7 +421,7 @@ Constraints: Cover accepted payloads, pinned-schema failures, and shape-valid-bu
 Done-when: Verification coverage fails until the implementation proves standard-payload validation behavior matches the documented allow and reject matrix exactly.
 Traceability: FR-001; FR-002; FR-014; AC-F7; AC-V1; NC-012.
 
-- [ ] T046 [P] Add replay hashing determinism and idempotency verification in tests/unit/normalized_json_hash.rs, tests/integration/register_source_replay_hashing.rs, and tests/fixtures/register_source/replay_hashing/*.json
+- [X] T046 [P] Add replay hashing determinism and idempotency verification in tests/unit/normalized_json_hash.rs, tests/integration/register_source_replay_hashing.rs, and tests/fixtures/register_source/replay_hashing/*.json
 Outcome: Replay behavior for supported standard payloads is verified directly against the normalized-hash rule and preserved-content retrieval guarantee.
 Dependencies: T016, T017, T021.
 Relevant inputs: spec.md FR-002, FR-005, AC-F2, AC-F3, AC-V2; plan.md Remaining Implementation Risks; data-model.md Canonicalization Rules.
@@ -429,7 +429,7 @@ Constraints: Prove that formatting-only variants of the same validated payload p
 Done-when: Verification coverage fails until replay hashing is demonstrably deterministic for equivalent payload semantics and conflict-producing for semantic divergence.
 Traceability: FR-002; FR-005; AC-F2; AC-F3; AC-V2.
 
-- [ ] T047 [P] Add authoritative outbox-to-projection mapping verification in tests/contract/indexing_outbox_mapping_contract.rs and tests/integration/indexing_status_mapping_flow.rs
+- [X] T047 [P] Add authoritative outbox-to-projection mapping verification in tests/contract/indexing_outbox_mapping_contract.rs and tests/integration/indexing_status_mapping_flow.rs
 Outcome: The durable indexing path is verified as a semantic mapping from authoritative rows to projection inputs, with public status translation checked independently from worker internals.
 Dependencies: T015, T029, T030.
 Relevant inputs: spec.md FR-006, FR-008, FR-009, AC-F1, AC-R2, AC-V3; plan.md Remaining Implementation Risks; data-model.md MemoryIndexJob and Public `indexing_status` Mapping.
@@ -445,7 +445,7 @@ Constraints: Cover duplicate registration races, conflicting concurrent payloads
 Done-when: Integration tests fail until the slice proves stateless multi-instance consistency and concurrent idempotency behavior.
 Traceability: NC-005; AC-F6; AC-R3.
 
-- [ ] T041 Update operational runbook coverage for indexing backlog inspection, retry exhaustion handling, and manual re-index recovery in specs/001-memory-ingest/quickstart.md, specs/001-memory-ingest/contracts/README.md, and README.md
+- [X] T041 Update operational runbook coverage for indexing backlog inspection, retry exhaustion handling, and manual re-index recovery in specs/001-memory-ingest/quickstart.md, specs/001-memory-ingest/contracts/README.md, and README.md
 Outcome: Operators have explicit guidance for identifying backlog growth, understanding dead-letter promotion, and rebuilding Meilisearch from authoritative data.
 Dependencies: T029, T033.
 Relevant inputs: quickstart.md Operational Validation Notes; plan.md Rollout / Migration Notes; spec.md edge case `Search projection failures`.
@@ -469,7 +469,7 @@ Constraints: Do not duplicate endpoint logic; treat the contract as the source o
 Done-when: There is a documented and automatable way to validate the implementation against the published contract set.
 Traceability: US1-US4; FR-001 through FR-013; constitution API contract tests.
 
-- [ ] T033 Update developer documentation and smoke-test instructions in specs/001-memory-ingest/quickstart.md and README.md
+- [X] T033 Update developer documentation and smoke-test instructions in specs/001-memory-ingest/quickstart.md and README.md
 Outcome: Local setup, environment variables, bootstrap commands, and manual verification steps reflect the implemented slice instead of placeholders.
 Dependencies: T002, T008, T017, T021, T025, T030.
 Relevant inputs: quickstart.md; README.md; user requirement `문서화 / quickstart 업데이트`.

@@ -78,19 +78,48 @@ async fn histogram_metrics_cover_all_public_endpoints_with_bounded_labels() {
     .await;
 
     let metrics = state.request_metrics().render_prometheus();
-    assert!(metrics.contains("route=\"/health\""));
-    assert!(metrics.contains("route=\"/ready\""));
-    assert!(metrics.contains("route=\"/sources/register\""));
-    assert!(metrics.contains("route=\"/sources/{source-id}\""));
-    assert!(metrics.contains("route=\"/memory-items/{urn}\""));
-    assert!(metrics.contains("route=\"/search/memory-items\""));
-    assert!(metrics.contains("document_type=\"markdown\""));
-    assert!(metrics.contains("document_type=\"json\""));
-    assert!(metrics.contains("ingest_kind=\"canonical\""));
-    assert!(metrics.contains("ingest_kind=\"direct_standard\""));
     assert!(metrics.contains("http_request_latency_ms_bucket"));
     assert!(metrics.contains("http_request_latency_ms_sum"));
     assert!(metrics.contains("http_request_latency_ms_count"));
+
+    assert_eq!(
+        metric_count(
+            &metrics,
+            "/sources/register",
+            201,
+            Some("markdown"),
+            Some("canonical")
+        ),
+        1
+    );
+    assert_eq!(
+        metric_count(
+            &metrics,
+            "/sources/register",
+            201,
+            Some("json"),
+            Some("direct_standard")
+        ),
+        1
+    );
+    assert_eq!(metric_count(&metrics, "/health", 200, None, None), 1);
+    assert_eq!(metric_count(&metrics, "/ready", 200, None, None), 1);
+    assert_eq!(
+        metric_count(&metrics, "/sources/{source-id}", 200, Some("markdown"), None),
+        1
+    );
+    assert_eq!(
+        metric_count(&metrics, "/memory-items/{urn}", 200, Some("markdown"), None),
+        1
+    );
+    assert_eq!(
+        metric_count(&metrics, "/search/memory-items", 200, Some("json"), None),
+        1
+    );
+
+    for bucket in [50, 100, 200, 500, 1_000, 5_000] {
+        assert!(metrics.contains(&format!("le=\"{bucket}\"")));
+    }
 }
 
 async fn post_json(app: &axum::Router, uri: &str, payload: Value) -> Value {
@@ -129,4 +158,28 @@ async fn decode_json(response: axum::response::Response) -> Value {
         .await
         .expect("response body must decode");
     serde_json::from_slice(&body).expect("response must be valid json")
+}
+
+fn metric_count(
+    metrics: &str,
+    route: &str,
+    status_code: u16,
+    document_type: Option<&str>,
+    ingest_kind: Option<&str>,
+) -> u64 {
+    let document_type = document_type.unwrap_or("unknown");
+    let ingest_kind = ingest_kind.unwrap_or("unknown");
+
+    metrics
+        .lines()
+        .find(|line| {
+            line.starts_with("http_request_latency_ms_count{")
+                && line.contains(&format!("route=\"{route}\""))
+                && line.contains(&format!("status_code=\"{status_code}\""))
+                && line.contains(&format!("document_type=\"{document_type}\""))
+                && line.contains(&format!("ingest_kind=\"{ingest_kind}\""))
+        })
+        .and_then(|line| line.rsplit_once(' '))
+        .and_then(|(_, value)| value.parse::<u64>().ok())
+        .unwrap_or_default()
 }

@@ -1,6 +1,6 @@
 # API Contract
 
-**Status**: IMPLEMENT-READY
+**Status**: IMPLEMENTED
 
 This directory contains the public HTTP contract for the first memory-ingest vertical slice.
 
@@ -30,6 +30,27 @@ This directory contains the public HTTP contract for the first memory-ingest ver
 - Storage-adapter contract tests must complement the public HTTP contract by verifying SurrealDB authoritative guarantees and Meilisearch projection guarantees required by the constitution.
 - Performance validation must use the instrumented metrics pipeline to measure p95/p99 latency and error rate against the published performance criteria.
 
+## Verification Commands
+
+Run the replay hashing and authoritative outbox mapping verification:
+
+```bash
+cargo test --test register_source_replay_hashing --test indexing_outbox_mapping_contract --test indexing_status_mapping_flow
+```
+
+Run the observability verification tied to the public runtime surface:
+
+```bash
+cargo test --test observability_tracing_flow --test observability_metrics
+```
+
+Run the performance gate and benchmark report:
+
+```bash
+cargo test --test memory_ingest_slo -- --nocapture
+cargo bench --bench memory_ingest_latency
+```
+
 ## Search Slice Commands
 
 Run the search endpoint and projection adapter coverage:
@@ -52,6 +73,12 @@ cargo bench --bench memory_ingest_latency
 ```
 
 The search contract is satisfied only if `GET /search/memory-items` returns projection hits on healthy indexing and returns a structured `503` when Meilisearch is unavailable. There is no SurrealDB fallback path for search.
+
+## Operator Notes
+
+- Inspect backlog and retry exhaustion in authoritative SurrealDB outbox rows, not in Meilisearch.
+- Public `indexing_status` is limited to `queued`, `indexed`, and `deferred`; internal job states remain implementation-only.
+- Manual recovery is supported only by requeueing durable `memory_index_job` rows and rebuilding the `memory_items_v1` projection from authoritative `memory_source` and `memory_item` data.
 
 ## Implementation Verification Checkpoints
 

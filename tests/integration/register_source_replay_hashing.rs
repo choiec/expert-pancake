@@ -31,6 +31,9 @@ fn fixture(path: &str) -> &'static str {
         "clr_conflict" => {
             include_str!("../fixtures/register_source/replay_hashing/clr_conflict.json")
         }
+        "open_badges_conflict" => {
+            include_str!("../fixtures/register_source/standards/open_badges_conflict.json")
+        }
         _ => panic!("unknown fixture path: {path}"),
     }
 }
@@ -205,4 +208,56 @@ async fn clr_semantic_conflict_returns_conflict_without_overwriting_first_body()
         .expect("original CLR memory item should be readable");
 
     assert_eq!(memory_item.content, first_body);
+}
+
+#[tokio::test]
+async fn open_badges_semantic_conflict_returns_conflict_without_overwriting_first_body() {
+    let db = Arc::new(InMemorySurrealDb::new());
+    let service = build_service(db.clone());
+    let query_service =
+        GetMemoryItemService::new(Arc::new(SurrealMemoryQueryRepository::new(db.clone())));
+
+    let first_body = fixture("open_badges_compact");
+    let conflicting_body = fixture("open_badges_conflict");
+
+    let created = service
+        .execute(RegisterSourceCommand {
+            external_id: "urn:badge:001".to_owned(),
+            title: "Rust Badge".to_owned(),
+            summary: Some("badge conflict test".to_owned()),
+            document_type: DocumentType::Json,
+            authoritative_content: first_body.to_owned(),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org"}),
+            canonical_payload_hash: normalized_json_hash_from_str(first_body)
+                .expect("compact badge should hash"),
+            ingest_kind: IngestKind::DirectStandard,
+        })
+        .await
+        .expect("first badge registration should succeed");
+
+    let error = service
+        .execute(RegisterSourceCommand {
+            external_id: "urn:badge:001".to_owned(),
+            title: "Rust Badge".to_owned(),
+            summary: Some("badge conflict test".to_owned()),
+            document_type: DocumentType::Json,
+            authoritative_content: conflicting_body.to_owned(),
+            source_metadata: serde_json::json!({"issuer": "issuer.example.org"}),
+            canonical_payload_hash: normalized_json_hash_from_str(conflicting_body)
+                .expect("conflicting badge should hash"),
+            ingest_kind: IngestKind::DirectStandard,
+        })
+        .await
+        .expect_err("semantic conflict should fail");
+
+    assert_eq!(error.kind(), ErrorCode::Conflict);
+
+    let memory_item = query_service
+        .execute(&MemoryItemUrn::new(created.memory_items[0].urn.clone()))
+        .await
+        .expect("original badge memory item should be readable");
+
+    assert_eq!(memory_item.content, first_body);
+    assert_eq!(memory_item.document_type, DocumentType::Json);
+    assert_eq!(memory_item.unit_type, "json_document");
 }

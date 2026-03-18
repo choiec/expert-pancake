@@ -1,0 +1,12 @@
+{
+  "registration_iterations": 20,
+  "retrieval_iterations": 20,
+  "search_iterations": 20,
+  "benchmark_iterations": 10,
+  "canonical_markdown_target_bytes": 98304,
+  "search_corpus_sources": 250,
+  "registration_threshold_ms": 5000,
+  "retrieval_threshold_ms": 200,
+  "source_retrieval_threshold_ms": 200,
+  "search_threshold_ms": 500
+}
