@@ -2,108 +2,135 @@
 
 ## Purpose
 
-Ratify the technical decisions required to implement canonical `external_id` governance together with deterministic UUID v5 `source_id` generation across all persisted rows.
+Record the authoritative planning decisions that close the rollout-blocking ambiguity for canonical source identity, replay semantics, observability, and legacy migration safety.
 
-## Decision 1: Introduce a domain-owned canonical external-id value object
+## Decision 1: Canonical URI v1 remains the single persisted external identity form
 
-- **Decision**: Add a `SourceExternalId` value object to the `mod_memory` domain and make it the single rule owner for parsing, formatting, and validating canonical external identifiers.
-- **Rationale**: The current implementation treats `external_id` as an unconstrained string and duplicates meaning between handler logic, service validation, and repository conflict handling. A value object gives one place to enforce project-owned namespace, vocabulary, source-domain normalization, non-lossy object-id encoding, and `canonical_id_version`.
+- **Decision**: Persist governed `external_id` values only as `https://api.cherry-pick.net/{standard}/{version}/{source-domain}:{object-id}` and record `canonical_id_version = v1` on every governed row.
+- **Rationale**: One persisted form eliminates replay ambiguity, keeps namespace ownership explicit, and makes migration verifiable.
 - **Alternatives considered**:
-  - Keep `external_id` as a string and validate only at the handler: rejected because repository and service layers would still operate on ad hoc semantics.
-  - Parse canonical URIs only in tests/docs: rejected because runtime drift would remain likely.
+  - Accept multiple persisted URI forms: rejected because replay and conflict semantics would remain unstable.
+  - Store grammar version only in docs: rejected because migration and future versioning would become opaque.
 
-## Decision 2: Standardize `external_id` and derive `source_id` deterministically from canonical source identity
+## Decision 2: Deterministic source-id seed includes canonical version and canonical URI
 
-- **Decision**: Keep `source_id` as a separate internal role, but generate it deterministically as UUID v5 from a project-owned namespace plus canonical source seed. Keep memory-item URNs derived exactly as they are today.
-- **Rationale**: The requirement is to eliminate UUID v4 usage for source identity while keeping internal and external identifiers separate. Canonical-source-seed derivation makes `source_id` stable across replay and migration.
+- **Decision**: Derive `source_id` from the exact seed string `source|{canonical_id_version}|{canonical_external_id}` for every new and migrated row.
+- **Rationale**: Including `canonical_id_version` prevents silent collisions across future grammar revisions while keeping the seed rooted in canonical identity only.
 - **Alternatives considered**:
-  - Keep `source_id` as UUID v4: rejected because it does not satisfy deterministic identity requirements.
-  - Re-seed memory-item URNs from canonical `external_id`: rejected because it would change immutable retrieval identifiers.
+  - Seed from canonical URI alone: rejected because a future grammar version could reuse the same text with different semantics.
+  - Seed from raw request content: rejected because mutable formatting and non-canonical aliases are forbidden seed inputs.
 
-## Decision 2A: Migrate all existing source rows to the UUID v5 rule in this feature
+## Decision 3: Legacy seed completion uses the same contract as new writes
 
-- **Decision**: The rollout includes a mandatory migration that rewrites existing `source_id` values and every dependent reference so no mixed v4/v5 population remains in authoritative or projection storage.
-- **Rationale**: Mixed identity regimes would complicate retrieval, replay, contracts, and future code. The requirement is to stop using v4 entirely, not just for new writes.
+- **Decision**: Legacy rows first derive `canonical_external_id`, then set `canonical_id_version = v1`, then derive target `source_id`; legacy-only seed branches are prohibited.
+- **Rationale**: A single seed contract keeps replay, migration verification, and mixed-population lookups deterministic.
 - **Alternatives considered**:
-  - Grandfather legacy rows: rejected because it leaves v4 in active storage.
-  - Dual-read or dual-write compatibility windows: rejected because they prolong mixed semantics and migration risk.
+  - Preserve legacy random UUIDs: rejected because the constitution now requires deterministic source identity.
+  - Build a separate migration-only seed: rejected because it would create two competing identity regimes.
 
-## Decision 3: Canonical URI grammar `v1` is the only accepted persisted form for new writes
+## Decision 4: The authoritative replay field name is semantic_payload_hash
 
-- **Decision**: Persist new governed `external_id` values only as `https://api.cherry-pick.net/{standard}/{version}/{source-domain}:{object-id}` and record `canonical_id_version = v1` in `source_metadata.system`.
-- **Rationale**: The grammar encodes the fields required for reconciliation and stays auditable through an explicit version marker.
+- **Decision**: Persist and expose `semantic_payload_hash` as the authoritative replay and conflict comparator.
+- **Rationale**: The name describes the actual behavior and removes the drift created by `canonical_payload_hash`.
 - **Alternatives considered**:
-  - Accept multiple URI forms and normalize later: rejected because replay/conflict behavior would remain ambiguous.
-  - Store version only in docs, not data: rejected because future grammar changes would become opaque.
+  - Keep `canonical_payload_hash` as the main name: rejected because it no longer reflects the intended semantics and conflicts with the closed design vocabulary.
 
-## Decision 4: Preserve original standard payload ids as provenance only
+## Decision 5: canonical_payload_hash is a one-way compatibility alias only
 
-- **Decision**: Direct-standard ingest stores the raw payload `id` in `source_metadata.system.original_standard_id` and never uses it as the persisted canonical `external_id`.
-- **Rationale**: This satisfies provenance requirements while keeping canonical identity under project governance.
+- **Decision**: Read `canonical_payload_hash` only while classifying legacy rows; rewrite it into `semantic_payload_hash` and remove the alias from authoritative storage during migration.
+- **Rationale**: This preserves migration compatibility without leaving two authoritative names in steady state.
 - **Alternatives considered**:
-  - Overwrite `external_id` with raw standard ids and add a second canonical field: rejected because it breaks contract simplicity and weakens idempotency semantics.
-  - Drop the original id after canonicalization: rejected because auditability would be lost.
+  - Persist both names indefinitely: rejected because that would preserve drift in code, contracts, and operations.
+  - Drop the legacy alias without migration handling: rejected because old rows would become unreadable or unverifiable.
 
-## Decision 5: Replay/conflict semantics use canonical `external_id` plus semantic payload hash
+## Decision 6: raw_body_hash is diagnostics-only and stays off the public API surface
 
-- **Decision**: Use canonical `external_id` plus `semantic_payload_hash` as the authoritative replay/conflict gate. Retain `raw_body_hash` only for audit/debug if useful.
-- **Rationale**: Formatting-only differences and raw-standard-id spelling differences should not create new records when they canonicalize to the same logical source. The current normalized raw-JSON hash is not strong enough for that because it still treats raw `id` spelling as semantic.
+- **Decision**: Store `raw_body_hash` only when a raw body exists, never use it for replay or conflict, never expose it in public API responses, and never use it as a metric label.
+- **Rationale**: The hash is useful for operator diagnostics and migration audit, but it is not part of public source identity semantics.
 - **Alternatives considered**:
-  - Continue using normalized JSON of the raw request body: rejected because equivalent raw ids could still diverge.
-  - Compare only canonical `external_id` and ignore payload content: rejected because true conflicts would be missed.
+  - Expose `raw_body_hash` publicly: rejected because it does not add user-facing value and expands the public contract unnecessarily.
+  - Discard it entirely: rejected because it weakens operator diagnostics for replay, migration, and raw-body retention questions.
 
-## Decision 6: Build the semantic hash from a canonical projection, not the raw direct-standard body
+## Decision 7: Registration and retrieval use one public provenance envelope
 
-- **Decision**: For direct-standard ingest, compute `semantic_payload_hash` from a deterministic canonical projection that uses canonical `external_id` and strips audit-only/raw-provenance noise. For canonical/manual ingest, hash the normalized command shape rather than raw request formatting.
-- **Rationale**: This keeps replay semantics tied to meaning rather than transport syntax while still letting retrieval preserve the first committed raw body.
+- **Decision**: Both registration and retrieval responses expose `source_metadata.system` with `canonical_id_version`, `ingest_kind`, `semantic_payload_hash`, and `original_standard_id` when present.
+- **Rationale**: One shape eliminates contract drift and gives clients a single authoritative provenance view.
 - **Alternatives considered**:
-  - Reuse the existing raw normalized JSON hasher for all ingest kinds: rejected for the reasons above.
-  - Store only raw-body hash: rejected because it makes formatting differences authoritative.
+  - Return provenance only on retrieval: rejected because registration would still hide key canonicalization outcomes.
+  - Use different registration and retrieval shapes: rejected because that would preserve drift.
 
-## Decision 7: Preserve first-commit raw body for direct-standard ingest
+## Decision 8: Observability is internal diagnostics plus public request correlation and provenance
 
-- **Decision**: Keep the current behavior where the first accepted direct-standard UTF-8 body remains the authoritative `json_document` content returned by retrieval endpoints.
-- **Rationale**: Existing tests and operator expectations depend on retrieval reflecting the first authoritative submission, and the feature request explicitly says raw body preservation should remain under review rather than be removed.
+- **Decision**: Structured logs, traces, and bounded metrics are internal diagnostics. Public observability surface is limited to request or trace correlation headers, error-body `request_id`, and the public provenance envelope.
+- **Rationale**: This honors the constitution while preventing internal operator diagnostics from becoming unstable public API commitments.
 - **Alternatives considered**:
-  - Rewrite stored content to canonical JSON: rejected because it would change retrieval semantics and hide provenance.
+  - Treat logs and metrics as public contract: rejected because that would freeze internal diagnostics and high-cardinality fields.
+  - Keep observability undefined at the feature level: rejected because the constitution explicitly requires operational traceability.
 
-## Decision 8: Trusted source-domain derivation must be explicit and reject ambiguity
+## Decision 9: Operator-facing decision diagnostics are mandatory for canonicalization, replay, conflict, migration, and mixed-population lookup
 
-- **Decision**: For direct-standard ingest, derive `source-domain` from a trusted issuer/publisher host in the payload or an ingest-context producer domain. If neither is trustworthy, reject the request.
-- **Rationale**: Silent domain guessing would create unstable or unsafe canonical identifiers.
+- **Decision**: Emit structured decision events for canonicalization acceptance or rejection, replay classification, conflict detection, migration row classification, migration execution, migration abort, migration verification, and legacy lookup resolution.
+- **Rationale**: Operators need to explain each identity-affecting outcome without reconstructing it from raw payloads or storage diffs.
 - **Alternatives considered**:
-  - Use the raw payload `id` authority blindly: rejected because `id` can be opaque or user-controlled.
-  - Fall back to any URL-looking field in the payload: rejected because trust would be unclear.
+  - Emit only generic request logs: rejected because that would not satisfy handler-level traceability requirements.
 
-## Decision 9: Govern standard/version vocabulary through a repository artifact, not runtime remote config
+## Decision 10: Migration classification uses migratable, consolidate, and unmigratable
 
-- **Decision**: Publish `contracts/canonical-vocabulary.yaml` as the governance source for canonical family/version tokens and aliases. Implementation should use a static or build-time checked mirror rather than parse YAML on every request.
-- **Rationale**: The constitution requires a versioned repository artifact, but request-path performance and failure handling are better if runtime parsing stays out of the hot path.
+- **Decision**: Every legacy row is classified as `migratable`, `consolidate`, or `unmigratable`.
+- **Rationale**: These three classes cover safe rewrite, duplicate collapse, and cutover-blocking failure without leaving undefined intermediate states.
 - **Alternatives considered**:
-  - Runtime remote registry lookup: rejected because it adds latency and operational fragility to registration.
-  - No registry artifact, only Rust constants: rejected because docs/contracts would stop being authoritative.
+  - Binary migrate or skip split: rejected because duplicate canonical identities require explicit consolidation semantics.
+  - Best-effort migration with partial leftovers: rejected because the rollout requires zero steady-state ambiguity.
 
-## Decision 10: Existing rows are rewritten under a single migration plan
+## Decision 11: Same canonical identity with different semantic payloads blocks rollout
 
-- **Decision**: Rewrite existing rows so `source`, `memory_item`, indexing jobs, search projections, and any other persisted `source_id` references all move to the deterministic UUID v5 scheme in one governed migration.
-- **Rationale**: The rollout requirement is global v5 adoption, so migration must be a first-class part of the feature rather than deferred.
+- **Decision**: If two legacy rows derive the same canonical `external_id` and different `semantic_payload_hash` values, classify the group as `unmigratable` and abort cutover.
+- **Rationale**: The system cannot guess which row is authoritative without violating replay or conflict semantics.
 - **Alternatives considered**:
-  - Leave rows unchanged: rejected because it violates the no-v4 requirement.
+  - Pick the newest row: rejected because it hides semantic conflict.
+  - Keep both rows under one canonical identity: rejected because uniqueness and replay rules would fail.
 
-## Implementation Implications
+## Decision 12: Same canonical identity with the same semantic payload consolidates
 
-- `source_register.rs` needs explicit canonical/manual validation and direct-standard canonicalization paths.
-- `RegisterSourceCommand` needs richer validated identity/provenance fields.
-- Deterministic `source_id` generation must replace random UUID allocation in application flow.
-- Migration planning must cover all persistent `source_id` references, not just the `source` table.
-- `SourceSystemMetadata` must evolve from a minimal hash + ingest-kind pair to a provenance envelope.
-- Replay/conflict tests must stop treating raw payload ids as canonical identity.
+- **Decision**: If multiple legacy rows derive the same canonical `external_id` and the same `semantic_payload_hash`, consolidate them to one deterministic target `source_id` and repoint dependent references.
+- **Rationale**: Duplicate logical rows should collapse to one authoritative identity in steady state.
+- **Alternatives considered**:
+  - Preserve duplicates: rejected because uniqueness and replay semantics would remain ambiguous.
+
+## Decision 13: Mixed legacy and canonical populations exist only during an offline write-frozen window
+
+- **Decision**: Disable registration writes during migration execution. Reads remain available through a remap path from legacy `source_id` values to deterministic targets.
+- **Rationale**: Live writes against partially rewritten identity state would create race conditions and ambiguous replay outcomes.
+- **Alternatives considered**:
+  - Keep writes enabled and dual-write: rejected because it prolongs mixed semantics and increases rollback complexity.
+  - Shut down all reads and writes: rejected because read-only service continuity is achievable with remap lookup.
+
+## Decision 14: Rollback uses snapshot restore only
+
+- **Decision**: Rollback is a full snapshot restore of authoritative storage plus projection restore or rebuild. Partial reverse rewrites are prohibited.
+- **Rationale**: Partial reverse rewrites create new ambiguity and are harder to verify than restoring a known-good snapshot.
+- **Alternatives considered**:
+  - Best-effort reverse migration: rejected because it cannot guarantee consistent source, memory-item, and indexing state.
+
+## Decision 15: Dry-run report format is contractually fixed
+
+- **Decision**: The dry-run artifact is a JSON report with required run summary, per-row classification, canonical target identifiers, decision reason, legacy resolution path, provenance summary, dependent-reference counts, and action.
+- **Rationale**: Operators need deterministic review material before execution, and tasks need a closed report shape to implement against.
+- **Alternatives considered**:
+  - Human-only markdown report: rejected because execution gating and automated review need a machine-readable source of truth.
+
+## Decision 16: Normalization regression coverage is a mandatory acceptance gate
+
+- **Decision**: Object-id collisions, source-domain edge cases, and canonical URI golden outputs are not discretionary enhancements; they are mandatory acceptance criteria.
+- **Rationale**: Canonical identity safety depends on proving that the normalization rules do not collapse or leak aliases.
+- **Alternatives considered**:
+  - Add edge cases later as follow-up hardening: rejected because rollout safety depends on them now.
 
 ## Residual Risks
 
-- Semantic projection boundaries can be underspecified if the implementation does not clearly document which fields are included or rewritten before hashing.
-- Vocabulary drift remains possible if the YAML contract and Rust registry mirror are not parity-tested.
+- No rollout-blocking design ambiguity remains.
+- Remaining risk is execution quality only: implementation must follow the closed plan and preserve the public-versus-internal contract split.
 
 ## Status
 
-All planning-time clarifications required for implementation are resolved for this feature.
+All planning-time ambiguity for the 002 feature is closed.

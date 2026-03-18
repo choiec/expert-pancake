@@ -2,15 +2,17 @@
 
 ## Purpose
 
-Describe the validation workflow for implementing and verifying canonical `external_id` governance across manual and direct-standard ingest.
+Describe the authoritative rollout sequence, safety gates, verification expectations, and validation workflow for canonical `external_id` governance and deterministic `source_id` migration.
 
 ## Prerequisites
 
 - Rust stable toolchain with edition 2024 support
 - Docker and Docker Compose
-- Local SurrealDB and Meilisearch instances as already used by the memory-ingest slice
+- Local SurrealDB and Meilisearch instances used by the memory-ingest slice
+- Snapshot and restore access for SurrealDB tables `memory_source`, `memory_item`, and `memory_index_job`
+- Meilisearch export or rebuild procedure validated before first production rollout
 
-## Validation Sequence After Implementation
+## Public API Validation After Implementation
 
 1. Start infrastructure.
 
@@ -40,11 +42,13 @@ curl -i http://127.0.0.1:3000/sources/register \
 Expected result:
 
 - `201 Created`
-- response `external_id` exactly matches the submitted canonical URI
-- response `source_id` is a deterministic UUID v5 derived from the canonical source seed
+- top-level `external_id` exactly matches the submitted canonical URI
 - `source_metadata.system.canonical_id_version = "v1"`
+- `source_metadata.system.ingest_kind = "canonical"`
+- `source_metadata.system.semantic_payload_hash` is present
+- `x-request-id` response header is present
 
-4. Verify malformed or non-canonical manual ids are rejected.
+4. Verify malformed or non-canonical manual identifiers are rejected.
 
 ```bash
 curl -i http://127.0.0.1:3000/sources/register \
@@ -60,9 +64,10 @@ curl -i http://127.0.0.1:3000/sources/register \
 Expected result:
 
 - `400 Bad Request`
-- structured validation error indicating invalid canonical external id
+- structured error body contains `request_id`
+- operator diagnostics include `decision_reason = MANUAL_CANONICAL_REJECTED`
 
-5. Verify direct-standard ingest derives canonical `external_id` and preserves original payload id.
+5. Verify direct-standard ingest derives canonical `external_id` and preserves the original payload `id` separately.
 
 ```bash
 curl -i http://127.0.0.1:3000/sources/register \
@@ -79,18 +84,25 @@ curl -i http://127.0.0.1:3000/sources/register \
 Expected result:
 
 - `201 Created`
-- response `external_id` uses the project-owned namespace
-- response `source_id` is deterministic for the same canonical source identity
-- retrieval shows `source_metadata.system.original_standard_id = "urn:example:badge:001"`
-- retrieval still returns one `json_document` memory item with the first committed raw body
+- top-level `external_id = "https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Aexample%3Abadge%3A001"`
+- `source_metadata.system.ingest_kind = "direct_standard"`
+- `source_metadata.system.original_standard_id = "urn:example:badge:001"`
+- `source_metadata.system.semantic_payload_hash` is present
+- public response omits `raw_body_hash`
 
-6. Verify replay semantics ignore raw-formatting and raw-id spelling noise after canonicalization.
+6. Verify replay semantics ignore raw formatting and raw-id spelling noise after canonicalization.
 
-- Submit two direct-standard payloads that normalize to the same canonical URI and same semantic projection.
-- Expect second request to return `200 OK` with the same `source_id` and `memory_items`.
-- Confirm the first committed raw body remains authoritative through `GET /memory-items/{urn}`.
+- Submit two direct-standard payloads that normalize to the same canonical URI and the same semantic projection.
+- Expect the second request to return `200 OK` with the same `source_id`.
+- Confirm operator diagnostics include `decision_reason = REPLAY_SEMANTIC_MATCH`.
 
-7. Run regression and performance gates.
+7. Verify conflict semantics reject semantic divergence.
+
+- Submit a payload that resolves to the same canonical URI and a different semantic projection.
+- Expect `409 Conflict`.
+- Confirm operator diagnostics include `decision_reason = CONFLICT_SEMANTIC_MISMATCH`.
+
+8. Run regression and performance gates.
 
 ```bash
 cargo test --tests
@@ -98,9 +110,153 @@ cargo test --test memory_ingest_slo -- --nocapture
 cargo bench --bench memory_ingest_latency --no-run
 ```
 
-## Migration Checks
+## Rollout Runbook
 
-- Run the source-id migration and confirm no persisted `source_id` remains outside the UUID v5 rule.
-- Confirm migrated rows remain retrievable through `/sources/{source-id}` and `/memory-items/{urn}`.
-- Confirm new writes always record `canonical_id_version = "v1"`.
-- Confirm no API example or contract test still treats direct-standard payload `id` as canonical `external_id` or assumes UUID v4 source ids.
+### Phase 0: Pre-migration checklist
+
+1. Create and verify a SurrealDB snapshot for `memory_source`, `memory_item`, and `memory_index_job`.
+2. Create and verify a Meilisearch export or rehearse full rebuild.
+3. Confirm no indexing backlog remains.
+4. Put registration writes into maintenance mode.
+5. Confirm the release build contains canonical read compatibility, migration reporting, and verification tooling.
+6. Run dry-run against a production-equivalent snapshot.
+
+Cutover cannot proceed until every checklist item is complete.
+
+### Phase 1: Dry-run
+
+The migration command runs in dry-run mode first and emits one JSON report with this required structure:
+
+```json
+{
+  "run_id": "uuid",
+  "migration_phase": "dry_run",
+  "summary": {
+    "total_rows": 0,
+    "migratable_rows": 0,
+    "consolidation_groups": 0,
+    "unmigratable_rows": 0,
+    "conflict_groups": 0,
+    "reference_gap_rows": 0,
+    "stop_required": false
+  },
+  "rows": [
+    {
+      "legacy_source_id": "uuid",
+      "candidate_source_id": "uuid",
+      "canonical_external_id": "string",
+      "classification": "migratable",
+      "decision_reason": "LEGACY_ROW_MIGRATABLE",
+      "legacy_resolution_path": "legacy_only",
+      "dependent_reference_counts": {
+        "memory_item": 0,
+        "memory_index_job": 0,
+        "search_projection": 0
+      },
+      "action": "rewrite"
+    }
+  ]
+}
+```
+
+### Dry-run acceptance criteria
+
+- every in-scope row appears in `rows`
+- `unmigratable_rows = 0`
+- `conflict_groups = 0`
+- `reference_gap_rows = 0`
+- every candidate `source_id` is derivable from `source|v1|{canonical_external_id}`
+- every duplicate canonical identity is already resolved to `consolidate`
+
+Failure of any criterion stops rollout.
+
+### Phase 2: Execution window
+
+1. Keep registration writes disabled.
+2. Execute migration against the latest verified snapshot state.
+3. Allow reads only through canonical lookup or the legacy remap path.
+4. Record migration diagnostics for every rewritten or consolidated row.
+
+### Mixed-population rules during execution
+
+- `old row only`: readable through legacy path; registration writes denied.
+- `new row only`: readable through canonical lookup; registration writes denied until verification completes.
+- `old + new coexist`: rewritten row is authoritative; legacy row resolves through remap path only.
+- `partially migrated population`: read-only; registration writes denied.
+- `same logical object in old and new semantics`: consolidate if semantic hash matches; abort if semantic hash differs.
+- `duplicate canonical identity candidates`: consolidate if semantic hash matches; abort if semantic hash differs.
+
+## Verification Requirements
+
+The rollout must execute verification queries that prove all of the following before sign-off:
+
+1. Every authoritative `memory_source.external_id` uses the project-owned canonical namespace.
+2. Every authoritative source row has `source_metadata.system.canonical_id_version = "v1"`.
+3. No authoritative source row still has `source_metadata.system.canonical_payload_hash`.
+4. Every `memory_item.source_id` points to an existing `memory_source.source_id`.
+5. Every `memory_index_job.source_id` points to an existing `memory_source.source_id`.
+6. The surviving authoritative source-row count equals the dry-run expected canonical identity count after consolidation.
+7. Dependent memory-item and index-job counts match the pre-migration counts after repointing.
+
+## Stop Conditions
+
+Stop execution and restore the snapshot if any of the following occurs:
+
+- any row is classified `unmigratable`
+- any canonical identity collision has divergent semantic payload hashes
+- any dependent reference cannot be rewritten
+- any verification query fails
+- any snapshot or backup gate fails
+- any registration write is observed during the maintenance window
+
+## Rollback Posture
+
+- Rollback is full snapshot restore only.
+- Partial reverse rewrites are not allowed.
+- After restore, keep registration writes disabled, re-run dry-run, and do not retry until the new dry-run satisfies all acceptance criteria.
+
+## Rewrite Completeness Threshold
+
+- 100% of in-scope source rows are rewritten or consolidated according to the dry-run plan.
+- 100% of dependent references are repointed.
+- 0 authoritative rows remain with non-canonical `external_id`, legacy `canonical_payload_hash`, or non-deterministic `source_id`.
+
+## Final Sign-off Gates
+
+1. All verification requirements pass.
+2. Canonical/manual registration smoke test passes.
+3. Direct-standard registration smoke test passes.
+4. Replay and conflict smoke tests pass.
+5. Retrieval of migrated rows passes.
+6. Observability diagnostics include decision reasons, request correlation, and migration phase fields.
+7. Snapshots remain retained through the post-cutover validation window.
+
+## Mandatory Regression Acceptance
+
+### Object-id collision matrix
+
+- `eng3-ch01`
+- `eng3_ch01`
+- `eng3ch01`
+- reserved URI characters
+- spaces
+- case preservation
+- raw-length versus encoded-length edges
+
+### Source-domain edge matrix
+
+- scheme stripping
+- port removal
+- `www.` normalization
+- trailing dot handling
+- IDN punycode
+- userinfo rejection
+- path contamination rejection
+- query-derived host rejection
+- ambiguous authority rejection
+
+### Canonical URI regression
+
+- golden outputs
+- alias non-leakage
+- namespace output stability

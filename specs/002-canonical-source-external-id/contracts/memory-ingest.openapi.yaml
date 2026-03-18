@@ -2,7 +2,14 @@ openapi: 3.1.0
 info:
   title: Memory Ingest API
   version: 0.2.0
-  summary: Planned contract for canonical source external-id governance.
+  summary: Canonical source external-id and deterministic source-id contract.
+  description: >-
+    Public contract for canonical/manual and direct-standard ingest after
+    canonical source identity governance. Structured logs, traces, migration
+    diagnostics, and bounded metrics are internal diagnostics and are not part
+    of the public response schema. Public observability surface is limited to
+    request-correlation headers, error-body request_id, and public provenance
+    metadata under source_metadata.system.
 servers:
   - url: http://127.0.0.1:3000
 paths:
@@ -28,24 +35,45 @@ paths:
       responses:
         '200':
           description: Idempotent replay of an existing authoritative source.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RegisterSourceResponse'
         '201':
           description: New source registered successfully.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RegisterSourceResponse'
         '400':
           description: Invalid canonical identity input or unmappable supported-standard payload.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
           description: Canonical external id already exists with a semantically different payload.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Registration write path disabled during migration execution.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
           content:
             application/json:
               schema:
@@ -64,17 +92,28 @@ paths:
       responses:
         '200':
           description: Source found.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SourceResponse'
         '404':
           description: Source not found.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestIdHeader'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
+  headers:
+    RequestIdHeader:
+      description: Request correlation identifier echoed by the server.
+      schema:
+        type: string
   schemas:
     CanonicalRegisterRequest:
       type: object
@@ -92,7 +131,7 @@ components:
         external-id:
           type: string
           description: Canonical project-owned source URI.
-          pattern: '^https://api\\.cherry-pick\\.net/[a-z0-9]+/v[0-9]+p[0-9]+(?:p[0-9]+)?/[^:]+:.+$'
+          pattern: '^https://api\.cherry-pick\.net/[a-z0-9]+/v[0-9]+p[0-9]+(?:p[0-9]+)?/[^:]+:.+$'
           examples:
             - https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01
             - https://api.cherry-pick.net/qti/v3p0/kice.re.kr:20240621
@@ -163,6 +202,7 @@ components:
         - external_id
         - document_type
         - indexing_status
+        - source_metadata
         - memory_items
       properties:
         source_id:
@@ -180,6 +220,8 @@ components:
         indexing_status:
           type: string
           enum: [queued, indexed, deferred]
+        source_metadata:
+          $ref: '#/components/schemas/SourceMetadataEnvelope'
         memory_items:
           type: array
           items:
@@ -222,18 +264,26 @@ components:
           type: string
           enum: [text, markdown, json]
         source_metadata:
-          type: object
-          additionalProperties: true
-          properties:
-            system:
-              $ref: '#/components/schemas/SourceSystemMetadata'
+          $ref: '#/components/schemas/SourceMetadataEnvelope'
         memory_items:
           type: array
           items:
             type: object
             additionalProperties: true
+    SourceMetadataEnvelope:
+      type: object
+      required:
+        - system
+      properties:
+        system:
+          $ref: '#/components/schemas/SourceSystemMetadata'
+      additionalProperties: true
     SourceSystemMetadata:
       type: object
+      description: >-
+        Public provenance contract. Internal diagnostics such as raw_body_hash,
+        migration_phase, legacy_resolution_path, and operator decision reasons
+        are intentionally excluded from this schema.
       required:
         - canonical_id_version
         - ingest_kind
@@ -249,15 +299,17 @@ components:
           type: string
         semantic_payload_hash:
           type: string
-        raw_body_hash:
-          type: string
+          description: Authoritative replay and conflict comparator.
     ErrorResponse:
       type: object
       required:
         - error_code
         - message
+        - request_id
       properties:
         error_code:
           type: string
         message:
+          type: string
+        request_id:
           type: string
