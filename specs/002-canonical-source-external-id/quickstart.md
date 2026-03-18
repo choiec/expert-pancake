@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Validate the pre-production `002` end state: one canonical external identity model, deterministic `source_id`, semantic replay or conflict rules, and no legacy compatibility or migration behavior.
+Validate the pre-production `002` end state: one canonical external identity model, deterministic `source_id`, semantic replay or conflict rules, and one active canonical-only public surface.
 
 ## Pre-production note
 
-This repository intentionally omits migration, cutover, rollback, remap lookup, and mixed-population support. Development and test data are expected to be reset to the canonical `002` model instead of migrated forward.
+This repository uses reset-and-retest workflows only. Development and test data are expected to be recreated directly in the canonical `002` model.
 
 ## Prerequisites
 
@@ -138,9 +138,8 @@ cargo bench --bench memory_ingest_latency --no-run
 
 The following behavior should not exist in this repository:
 
-- migration dry-run, execute, verify, rollback, or cutover commands
-- compatibility lookups by legacy or remapped `source_id`
-- migration-phase write denial
-- public response fields for transition state
-- `canonical_payload_hash` as an authoritative field name
-- random or fallback `source_id` generation
+- transition-management commands or write-path state machines
+- alternate lookup paths by non-canonical identifiers
+- public response fields for transitional state
+- superseded authoritative hash field names
+- nondeterministic `source_id` generation

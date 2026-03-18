@@ -4,7 +4,7 @@
 
 ## Summary
 
-Implement the canonical 002 identity model directly and delete all migration-era compatibility machinery. The resulting system keeps one canonical URI grammar, one deterministic UUID v5 `source_id` rule, one semantic replay comparator, and one public provenance shape.
+Implement the canonical 002 identity model directly and delete all transition-era machinery. The resulting system keeps one canonical URI grammar, one deterministic UUID v5 `source_id` rule, one semantic replay comparator, and one public provenance shape.
 
 ## Technical context
 
@@ -14,7 +14,7 @@ Implement the canonical 002 identity model directly and delete all migration-era
 - **Testing**: `cargo test --tests`, contract tests, integration tests, unit normalization tests, `cargo test --test memory_ingest_slo -- --nocapture`, `cargo bench --bench memory_ingest_latency --no-run`
 - **Target Platform**: Linux server workload on Debian 13 dev container and production-equivalent Linux hosts
 - **Constraints**: deterministic canonicalization, no lossy normalization, no public exposure of `raw_body_hash`, no high-cardinality metrics labels, no collapse of `source_id` and `external_id`
-- **Pre-production decision**: no deployed legacy data exists, so migration and compatibility support are intentionally removed rather than preserved.
+- **Pre-production decision**: no deployed earlier population exists, so transition-only behavior is intentionally removed rather than preserved.
 
 ## Constitution check
 
@@ -22,7 +22,7 @@ Implement the canonical 002 identity model directly and delete all migration-era
 - **Identifier role separation**: `source_id`, canonical `external_id`, and memory-item URNs remain separate roles.
 - **Canonicalization governance**: one project-owned namespace and `canonical_id_version = v1` stay explicit.
 - **Direct-standard provenance**: `original_standard_id` remains provenance-only.
-- **Observability**: keep request correlation and domain-relevant diagnostics; remove migration-only runtime fields.
+- **Observability**: keep request correlation and domain-relevant diagnostics; remove transition-only runtime fields.
 
 ## Planning invariants
 
@@ -31,7 +31,7 @@ Implement the canonical 002 identity model directly and delete all migration-era
 3. `semantic_payload_hash` is the only authoritative replay and conflict comparator.
 4. `raw_body_hash` is diagnostics-only and never affects public identity semantics.
 5. Registration and retrieval expose the same public provenance envelope under `source_metadata.system`.
-6. No runtime code remains for migration, remap, mixed-population behavior, or compatibility aliases.
+6. No runtime code remains for alternate lookup, phased-transition behavior, or secondary identifier branches.
 7. Memory-item URN generation does not change.
 
 ## Implementation shape
@@ -46,7 +46,7 @@ Implement the canonical 002 identity model directly and delete all migration-era
 
 - Registration computes canonical identity and deterministic `source_id` before persistence.
 - Repository replay checks use only canonical `external_id` plus `semantic_payload_hash`.
-- Retrieval resolves only canonical authoritative rows; no remap or legacy alias path exists.
+- Retrieval resolves only canonical authoritative rows; no alternate identifier path exists.
 
 ### HTTP surface
 
@@ -58,22 +58,22 @@ Implement the canonical 002 identity model directly and delete all migration-era
 
 - Keep `request_id`, `trace_id`, canonical identity context, and domain-relevant `decision_reason` values.
 - Keep bounded metrics labels: `method`, `route`, `status_code`, `document_type`, `ingest_kind`, `decision_reason`.
-- Remove migration-only runtime fields from logs, metrics, and responses.
+- Remove transition-only runtime fields from logs, metrics, and responses.
 
 ## Deletions required by this option
 
-- delete the dedicated migration subsystem
-- delete remap lookup and mixed-population read paths
-- delete migration-phase write denial
-- delete compatibility branches for legacy aliases or fallback IDs
-- delete any runtime dependence on `canonical_payload_hash`
+- delete the dedicated transition subsystem
+- delete alternate identifier lookup and split-population read paths
+- delete write-path phase-denial behavior
+- delete branches for non-canonical secondary identifiers or alternate IDs
+- delete any superseded authoritative hash field names from active artifacts
 
 ## Validation strategy
 
 1. Run contract, integration, unit, and perf-oriented tests.
 2. Confirm manual canonical validation and direct-standard derivation still pass.
 3. Confirm replay and conflict behavior still pass.
-4. Confirm no runtime symbol or response shape includes migration-only state.
+4. Confirm no runtime symbol or response shape includes transition-only state.
 5. Confirm the bench target still builds.
 
 ## Status

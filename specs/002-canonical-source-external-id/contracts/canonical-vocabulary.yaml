@@ -3,51 +3,34 @@ namespace: https://api.cherry-pick.net
 description: >-
   Authoritative registry for canonical source external-id standard and version
   tokens. Persisted external_id values must use only the canonical tokens listed
-  here. Aliases are accepted only as input mapping hints and must never be
-  persisted.
+  here.
 standards:
   - code: cc
     display_name: Common Cartridge
     persisted_versions:
       - v1p3
-    aliases:
-      - common-cartridge
-      - ims-cc
   - code: case
     display_name: CASE
     persisted_versions:
       - v1p0
-    aliases:
-      - imsx-case
   - code: qti
     display_name: QTI
     persisted_versions:
       - v3p0
-    aliases:
-      - ims-qti
-      - qti3
   - code: ob
     display_name: Open Badges
     persisted_versions:
       - v2p0
-    aliases:
-      - open-badges
-      - openbadges
-      - achievementcredential
   - code: clr
     display_name: Comprehensive Learner Record
     persisted_versions:
       - v2p0
-    aliases:
-      - comprehensive-learner-record
-      - clrc
 direct_standard_profiles:
   - profile: open_badges_achievement_credential
     standard: ob
     version: v2p0
     trusted_domain_sources:
       - issuer.id
-      - ingest_context.producer_domain
     object_id_source: $.id
   - profile: clr_credential
     standard: clr
@@ -55,7 +38,6 @@ direct_standard_profiles:
     trusted_domain_sources:
       - publisher.id
       - issuer.id
-      - ingest_context.producer_domain
     object_id_source: $.id
 governance:
   change_policy: >-

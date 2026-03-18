@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Record the decisions behind the chosen Option A implementation: a pre-production simplification that deletes all migration and compatibility machinery and keeps only the canonical 002 runtime semantics.
+Record the decisions behind the chosen Option A implementation: a pre-production simplification that deletes all transition-only machinery and keeps only the canonical 002 runtime semantics.
 
 ## Decision 1: Persist only canonical project-owned URIs
 
@@ -19,7 +19,7 @@ Record the decisions behind the chosen Option A implementation: a pre-production
 ## Decision 3: Use one deterministic internal identity rule
 
 - `source_id` is always UUID v5 derived from `source|v1|{canonical_external_id}`.
-- There is no fallback, random, legacy, or migration-only seed branch.
+- There is no nondeterministic or transition-only seed branch.
 - `canonical_id_version = v1` remains persisted on every authoritative row.
 
 ## Decision 4: Keep one authoritative replay comparator
@@ -29,10 +29,10 @@ Record the decisions behind the chosen Option A implementation: a pre-production
 - `same canonical external_id + different semantic_payload_hash = conflict`.
 - `raw_body_hash` remains diagnostics-only and does not affect public identity semantics.
 
-## Decision 5: Delete migration and mixed-population abstractions entirely
+## Decision 5: Delete transition-only abstractions entirely
 
-- The project has not been deployed to production, so there is no requirement to preserve legacy rows or support cutover tooling.
-- Migration dry-run, execute, verify, rollback, remap lookup, write-freeze phases, and alias-resolution branches are intentionally removed instead of retained for hypothetical future use.
+- The project has not been deployed to production, so there is no requirement to preserve earlier authoritative rows through a transition subsystem.
+- Transition-management commands, alternate lookup branches, and write-freeze phases are intentionally removed instead of retained for hypothetical future use.
 - Development and test data are expected to be reset to the canonical 002 model.
 
 ## Decision 6: Keep public provenance parity
@@ -44,7 +44,7 @@ Record the decisions behind the chosen Option A implementation: a pre-production
 ## Decision 7: Keep observability focused on current behavior
 
 - Preserve request correlation, canonical identity context, and domain-relevant decision reasons.
-- Remove migration-only diagnostics such as `migration_phase` and `legacy_resolution_path` from runtime behavior and bounded metrics labels.
+- Remove transition-only diagnostics from runtime behavior and bounded metrics labels.
 
 ## Result
 
@@ -53,4 +53,4 @@ The repository now optimizes for present correctness and simplicity:
 - one canonical identity model
 - one deterministic source identifier rule
 - one replay or conflict model
-- no dormant compatibility hooks
+- no dormant transition hooks

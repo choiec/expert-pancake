@@ -9,7 +9,7 @@ This workspace now runs the simplified `002-canonical-source-external-id` model.
 - `GET /ready` is dependency-aware readiness for the authoritative write path.
 - Request tracing and Prometheus-compatible latency histograms are emitted for every public endpoint.
 
-This project is still pre-production. Legacy compatibility, migration, mixed-population handling, cutover support, and rollback tooling are intentionally omitted. The repository implements only the canonical 002 semantics that new data must follow.
+This project is still pre-production. The repository implements only the canonical 002 semantics that new data must follow and uses reset-and-recreate workflows for non-production data.
 
 ## Local Setup
 
@@ -114,8 +114,8 @@ Rejected behavior in this repository:
 
 - Non-canonical manual `external-id` inputs.
 - Using `raw_body_hash` as a replay or conflict input.
-- Legacy alias resolution or remapped `source_id` lookup.
-- Migration-specific write freezes, dry-runs, cutovers, or rollback flows.
+- Alternate identifier resolution paths for authoritative lookup.
+- Transition-management flows or write-path state machines.
 
 Retrieve authoritative records:
 

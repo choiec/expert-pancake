@@ -24,7 +24,7 @@ Represents the authoritative stored source after canonical identity validation o
 - `source_id` is derived from `source|v1|{canonical_external_id}`.
 - `external_id` always parses as canonical URI grammar `v1`.
 - `source_metadata.system` is server-managed and cannot be overwritten by caller payloads.
-- No authoritative row uses legacy alias fields or transition-only metadata.
+- No authoritative row uses alternate identifier fields or transition-only metadata.
 
 ## Canonical Source External ID
 
@@ -127,4 +127,4 @@ Hashes, canonical identifiers, and raw-body values are excluded from metrics lab
 
 ## Explicit omission
 
-This data model does not define migration reports, remap tables, transition phases, or rollback artifacts. Those structures were intentionally removed for the pre-production Option A implementation.
+This data model does not define transition-only reports, alternate identifier lookup tables, or write-path phase artifacts. Those structures were intentionally removed for the pre-production Option A implementation.
