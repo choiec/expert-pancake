@@ -18,3 +18,53 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 url = "2.5.4"
 uuid = { workspace = true }
+
+[dev-dependencies]
+app_server = { path = "../app_server" }
+axum.workspace = true
+tower.workspace = true
+uuid.workspace = true
+
+[[test]]
+name = "surreal_source_store_contract"
+path = "./tests/contract/surreal_source_store_contract.rs"
+
+[[test]]
+name = "surreal_memory_store_contract"
+path = "./tests/contract/surreal_memory_store_contract.rs"
+
+[[test]]
+name = "surreal_retention_contract"
+path = "./tests/contract/surreal_retention_contract.rs"
+
+[[test]]
+name = "indexing_outbox_mapping_contract"
+path = "./tests/contract/indexing_outbox_mapping_contract.rs"
+
+[[test]]
+name = "meilisearch_projection_contract"
+path = "./tests/contract/meilisearch_projection_contract.rs"
+
+[[test]]
+name = "register_source_replay_hashing"
+path = "./tests/integration/register_source_replay_hashing.rs"
+
+[[test]]
+name = "register_source_flow"
+path = "./tests/integration/register_source_flow.rs"
+
+[[test]]
+name = "register_source_standard_flow"
+path = "./tests/integration/register_source_standard_flow.rs"
+
+[[test]]
+name = "get_memory_item_flow"
+path = "./tests/integration/get_memory_item_flow.rs"
+
+[[test]]
+name = "get_source_flow"
+path = "./tests/integration/get_source_flow.rs"
+
+[[test]]
+name = "register_source_concurrency"
+path = "./tests/integration/register_source_concurrency.rs"

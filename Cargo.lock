@@ -2210,7 +2210,9 @@ dependencies = [
 name = "mod_memory"
 version = "0.1.0"
 dependencies = [
+ "app_server",
  "async-trait",
+ "axum",
  "core_infra",
  "core_shared",
  "hex",
@@ -2221,6 +2223,7 @@ dependencies = [
  "sha2",
  "time",
  "tokio",
+ "tower",
  "tracing",
  "url",
  "uuid",
@@ -2978,6 +2981,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71fe3824f5629716b1589be05dacd749f6aa084c87e00e016714a8cdfccc997c"
 dependencies = [
  "bytecheck",
+]
+
+[[package]]
+name = "repo_tests"
+version = "0.1.0"
+dependencies = [
+ "app_server",
+ "axum",
+ "core_infra",
+ "core_shared",
+ "mod_memory",
+ "serde_json",
+ "time",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -3953,24 +3974,6 @@ dependencies = [
  "dirs-next",
  "rustversion",
  "winapi",
-]
-
-[[package]]
-name = "tests"
-version = "0.1.0"
-dependencies = [
- "app_server",
- "axum",
- "core_infra",
- "core_shared",
- "mod_memory",
- "serde_json",
- "time",
- "tokio",
- "tower",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

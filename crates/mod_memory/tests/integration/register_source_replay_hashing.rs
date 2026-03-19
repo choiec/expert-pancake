@@ -17,22 +17,22 @@ use mod_memory::infra::surreal_source_repo::SurrealSourceRepository;
 fn fixture(path: &str) -> &'static str {
     match path {
         "open_badges_compact" => {
-            include_str!("../fixtures/register_source/replay_hashing/open_badges_compact.json")
+            include_str!("../../../repo_tests/fixtures/register_source/replay_hashing/open_badges_compact.json")
         }
         "open_badges_pretty" => {
-            include_str!("../fixtures/register_source/replay_hashing/open_badges_pretty.json")
+            include_str!("../../../repo_tests/fixtures/register_source/replay_hashing/open_badges_pretty.json")
         }
         "clr_compact" => {
-            include_str!("../fixtures/register_source/replay_hashing/clr_compact.json")
+            include_str!("../../../repo_tests/fixtures/register_source/replay_hashing/clr_compact.json")
         }
         "clr_pretty" => {
-            include_str!("../fixtures/register_source/replay_hashing/clr_pretty.json")
+            include_str!("../../../repo_tests/fixtures/register_source/replay_hashing/clr_pretty.json")
         }
         "clr_conflict" => {
-            include_str!("../fixtures/register_source/replay_hashing/clr_conflict.json")
+            include_str!("../../../repo_tests/fixtures/register_source/replay_hashing/clr_conflict.json")
         }
         "open_badges_conflict" => {
-            include_str!("../fixtures/register_source/standards/open_badges_conflict.json")
+            include_str!("../../../repo_tests/fixtures/register_source/standards/open_badges_conflict.json")
         }
         _ => panic!("unknown fixture path: {path}"),
     }

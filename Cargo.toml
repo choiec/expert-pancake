@@ -4,7 +4,7 @@ members = [
     "crates/core_infra",
     "crates/core_shared",
     "crates/mod_memory",
-    "crates/tests",
+    "crates/repo_tests",
 ]
 resolver = "3"
 

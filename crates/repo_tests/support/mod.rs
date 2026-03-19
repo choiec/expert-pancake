@@ -35,7 +35,7 @@ pub fn load_fixture(relative_path: &str) -> String {
         .parent()
         .expect("expected crate root")
         .to_path_buf();
-    let path = crate_root.join("tests/fixtures").join(relative_path);
+    let path = crate_root.join("repo_tests/fixtures").join(relative_path);
 
     fs::read_to_string(path).expect("fixture file must exist")
 }

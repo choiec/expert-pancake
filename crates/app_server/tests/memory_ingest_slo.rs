@@ -22,14 +22,16 @@ async fn memory_ingest_latency_stays_within_slo_thresholds() {
     let profile = load_profile();
 
     let canonical_template: Value = serde_json::from_str(include_str!(
-        "../fixtures/perf/canonical_markdown_small.json"
+        "../../repo_tests/fixtures/perf/canonical_markdown_small.json"
     ))
     .expect("canonical fixture must parse");
     let badge_template: Value =
-        serde_json::from_str(include_str!("../fixtures/perf/open_badges_small.json"))
+        serde_json::from_str(include_str!("../../repo_tests/fixtures/perf/open_badges_small.json"))
             .expect("badge fixture must parse");
-    let clr_template: Value = serde_json::from_str(include_str!("../fixtures/perf/clr_small.json"))
-        .expect("clr fixture must parse");
+    let clr_template: Value = serde_json::from_str(include_str!(
+        "../../repo_tests/fixtures/perf/clr_small.json"
+    ))
+    .expect("clr fixture must parse");
 
     let canonical_registration = run_registration_scenario(
         &app,
@@ -251,7 +253,7 @@ fn percentile_ms(samples: &[Duration], percentile: f64) -> u128 {
 }
 
 fn load_profile() -> Value {
-    serde_json::from_str(include_str!("../fixtures/perf/workload_profile.json"))
+    serde_json::from_str(include_str!("../../repo_tests/fixtures/perf/workload_profile.json"))
         .expect("workload profile must parse")
 }
 
