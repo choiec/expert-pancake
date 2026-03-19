@@ -292,3 +292,52 @@ fn percent_decode_utf8(input: &str) -> AppResult<String> {
     String::from_utf8(output)
         .map_err(|_| AppError::validation("external_id object_id is not valid UTF-8"))
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{DirectStandardProfile, canonicalize_direct_standard_payload};
+
+    #[test]
+    fn classifies_open_badges_payloads() {
+        let payload = json!({
+            "@context": ["https://www.w3.org/ns/credentials/v2"],
+            "type": ["VerifiableCredential", "OpenBadgeCredential"],
+            "id": " urn:badge:1 ",
+            "issuer": {
+                "id": "https://issuer.example.org"
+            },
+            "name": " Rust Badge "
+        });
+
+        let standard = canonicalize_direct_standard_payload(&payload)
+            .expect("open badges payload should canonicalize");
+
+        assert_eq!(
+            standard.profile,
+            DirectStandardProfile::OpenBadgesAchievementCredential
+        );
+        assert_eq!(
+            standard.external_id.canonical_uri(),
+            "https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Abadge%3A1"
+        );
+        assert_eq!(standard.original_standard_id, "urn:badge:1");
+        assert_eq!(standard.title, "Rust Badge");
+    }
+
+    #[test]
+    fn rejects_shape_valid_but_unmappable_standard_payloads() {
+        let payload = json!({
+            "@context": ["https://www.w3.org/ns/credentials/v2"],
+            "type": ["VerifiableCredential"],
+            "id": "urn:example:1",
+            "name": "Example"
+        });
+
+        let error = canonicalize_direct_standard_payload(&payload)
+            .expect_err("unsupported standard must fail");
+
+        assert_eq!(error.error_code(), "INVALID_STANDARD_PAYLOAD");
+    }
+}

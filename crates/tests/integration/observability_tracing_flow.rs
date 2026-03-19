@@ -164,8 +164,12 @@ async fn capture_tracing_output(future: impl std::future::Future<Output = ()>) -
 
     future.await;
 
-    String::from_utf8(buffer.lock().expect("log buffer poisoned").clone())
-        .expect("logs should be UTF-8")
+    let raw_bytes = {
+        let guard = buffer.lock().expect("log buffer poisoned");
+        guard.clone()
+    };
+
+    String::from_utf8(raw_bytes).expect("logs should be UTF-8")
 }
 
 #[derive(Clone)]

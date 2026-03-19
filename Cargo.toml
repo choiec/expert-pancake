@@ -1,14 +1,10 @@
-[package]
-name = "rust"
-version = "0.1.0"
-edition = "2024"
-
 [workspace]
 members = [
-	"crates/app_server",
-	"crates/core_infra",
-	"crates/core_shared",
-	"crates/mod_memory",
+    "crates/app_server",
+    "crates/core_infra",
+    "crates/core_shared",
+    "crates/mod_memory",
+    "crates/tests",
 ]
 resolver = "3"
 
@@ -28,128 +24,3 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt", "json"] }
 uuid = { version = "1.16.0", features = ["serde", "v4", "v5"] }
 validator = { version = "0.20.0", features = ["derive"] }
-
-[dev-dependencies]
-app_server = { path = "crates/app_server" }
-axum = { workspace = true }
-core_infra = { path = "crates/core_infra" }
-core_shared = { path = "crates/core_shared" }
-mod_memory = { path = "crates/mod_memory" }
-serde_json = { workspace = true }
-time = { version = "0.3.44", features = ["serde"] }
-tokio = { workspace = true }
-tower = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-uuid = { workspace = true }
-
-[[test]]
-name = "health_readiness_contract"
-path = "tests/contract/health_readiness_contract.rs"
-
-[[test]]
-name = "register_source_replay_hashing"
-path = "tests/integration/register_source_replay_hashing.rs"
-
-[[test]]
-name = "surreal_source_store_contract"
-path = "tests/contract/surreal_source_store_contract.rs"
-
-[[test]]
-name = "surreal_memory_store_contract"
-path = "tests/contract/surreal_memory_store_contract.rs"
-
-[[test]]
-name = "surreal_retention_contract"
-path = "tests/contract/surreal_retention_contract.rs"
-
-[[test]]
-name = "indexing_outbox_mapping_contract"
-path = "tests/contract/indexing_outbox_mapping_contract.rs"
-
-[[test]]
-name = "register_source_contract"
-path = "tests/contract/register_source_contract.rs"
-
-[[test]]
-name = "register_source_standard_errors"
-path = "tests/contract/register_source_standard_errors.rs"
-
-[[test]]
-name = "get_memory_item_contract"
-path = "tests/contract/get_memory_item_contract.rs"
-
-[[test]]
-name = "get_source_contract"
-path = "tests/contract/get_source_contract.rs"
-
-[[test]]
-name = "register_source_standard_validation_matrix"
-path = "tests/contract/register_source_standard_validation_matrix.rs"
-
-[[test]]
-name = "openapi_smoke"
-path = "tests/contract/openapi_smoke.rs"
-
-[[test]]
-name = "register_source_flow"
-path = "tests/integration/register_source_flow.rs"
-
-[[test]]
-name = "register_source_standard_flow"
-path = "tests/integration/register_source_standard_flow.rs"
-
-[[test]]
-name = "get_memory_item_flow"
-path = "tests/integration/get_memory_item_flow.rs"
-
-[[test]]
-name = "get_source_flow"
-path = "tests/integration/get_source_flow.rs"
-
-[[test]]
-name = "register_source_concurrency"
-path = "tests/integration/register_source_concurrency.rs"
-
-[[test]]
-name = "multi_instance_consistency"
-path = "tests/integration/multi_instance_consistency.rs"
-
-[[test]]
-name = "memory_ingest_vertical_slice"
-path = "tests/integration/memory_ingest_vertical_slice.rs"
-
-[[test]]
-name = "search_memory_items_contract"
-path = "tests/contract/search_memory_items_contract.rs"
-
-[[test]]
-name = "meilisearch_projection_contract"
-path = "tests/contract/meilisearch_projection_contract.rs"
-
-[[test]]
-name = "search_projection_flow"
-path = "tests/integration/search_projection_flow.rs"
-
-[[test]]
-name = "indexing_status_mapping_flow"
-path = "tests/integration/indexing_status_mapping_flow.rs"
-
-[[test]]
-name = "observability_tracing_flow"
-path = "tests/integration/observability_tracing_flow.rs"
-
-[[test]]
-name = "observability_metrics"
-path = "tests/integration/observability_metrics.rs"
-
-[[test]]
-name = "memory_ingest_slo"
-path = "tests/perf/memory_ingest_slo.rs"
-
-[[bench]]
-name = "memory_ingest_latency"
-path = "benches/memory_ingest_latency.rs"
-harness = false
-
-[dependencies]

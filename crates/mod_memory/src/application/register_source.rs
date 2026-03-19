@@ -9,9 +9,14 @@ use uuid::Uuid;
 use core_shared::{AppError, AppResult, IdGenerator};
 
 use crate::domain::event::GraphProjectionEvent;
-use crate::domain::normalization::{NormalizationInput, normalize_source};
+use crate::domain::normalization::{
+    NormalizationInput, normalize_source, normalized_json_hash_from_str, raw_body_hash_from_str,
+};
 use crate::domain::source::{
     CANONICAL_ID_VERSION, DocumentType, IngestKind, NewSource, SourceSystemMetadata,
+};
+use crate::domain::source_external_id::{
+    CanonicalSourceExternalId, canonicalize_direct_standard_payload,
 };
 use crate::domain::source_identity::deterministic_source_id;
 use crate::infra::graph::GraphProjectionPort;
@@ -48,6 +53,52 @@ pub struct RegisterSourceCommand {
 }
 
 impl RegisterSourceCommand {
+    pub fn canonical(
+        external_id: String,
+        title: String,
+        summary: Option<String>,
+        document_type: DocumentType,
+        authoritative_content: String,
+        source_metadata: Value,
+        raw_body: &str,
+    ) -> AppResult<Self> {
+        let title = title.trim().to_owned();
+        if title.is_empty() {
+            return Err(AppError::validation("title is required"));
+        }
+
+        Ok(Self {
+            external_id: CanonicalSourceExternalId::parse_canonical_uri(external_id.trim())?
+                .canonical_uri(),
+            title,
+            summary: summary.and_then(trimmed_option),
+            document_type,
+            authoritative_content,
+            source_metadata,
+            semantic_payload_hash: normalized_json_hash_from_str(raw_body)?,
+            original_standard_id: None,
+            raw_body_hash: None,
+            ingest_kind: IngestKind::Canonical,
+        })
+    }
+
+    pub fn direct_standard(value: &Value, raw_body: &str) -> AppResult<Self> {
+        let standard = canonicalize_direct_standard_payload(value)?;
+
+        Ok(Self {
+            external_id: standard.external_id.canonical_uri(),
+            title: standard.title,
+            summary: None,
+            document_type: DocumentType::Json,
+            authoritative_content: raw_body.to_owned(),
+            source_metadata: Value::Object(Default::default()),
+            semantic_payload_hash: normalized_json_hash_from_str(raw_body)?,
+            original_standard_id: Some(standard.original_standard_id),
+            raw_body_hash: Some(raw_body_hash_from_str(raw_body)),
+            ingest_kind: IngestKind::DirectStandard,
+        })
+    }
+
     pub fn validate(&self) -> AppResult<()> {
         if self.external_id.trim().is_empty() {
             return Err(AppError::validation("external_id is required"));
@@ -64,6 +115,15 @@ impl RegisterSourceCommand {
             ));
         }
         Ok(())
+    }
+}
+
+fn trimmed_option(value: String) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_owned())
     }
 }
 

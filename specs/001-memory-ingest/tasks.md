@@ -421,7 +421,7 @@ Constraints: Cover accepted payloads, pinned-schema failures, and shape-valid-bu
 Done-when: Verification coverage fails until the implementation proves standard-payload validation behavior matches the documented allow and reject matrix exactly.
 Traceability: FR-001; FR-002; FR-014; AC-F7; AC-V1; NC-012.
 
-- [X] T046 [P] Add replay hashing determinism and idempotency verification in tests/unit/normalized_json_hash.rs, tests/integration/register_source_replay_hashing.rs, and tests/fixtures/register_source/replay_hashing/*.json
+- [X] T046 [P] Add replay hashing determinism and idempotency verification in crates/mod_memory/tests/normalized_json_hash.rs, tests/integration/register_source_replay_hashing.rs, and tests/fixtures/register_source/replay_hashing/*.json
 Outcome: Replay behavior for supported standard payloads is verified directly against the normalized-hash rule and preserved-content retrieval guarantee.
 Dependencies: T016, T017, T021.
 Relevant inputs: spec.md FR-002, FR-005, AC-F2, AC-F3, AC-V2; plan.md Remaining Implementation Risks; data-model.md Canonicalization Rules.

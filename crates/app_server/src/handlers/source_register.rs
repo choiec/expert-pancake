@@ -9,14 +9,10 @@ use axum::{
 use core_shared::AppError;
 use mod_memory::{
     application::register_source::RegisterSourceCommand,
-    domain::{
-        normalization::{normalized_json_hash_from_str, raw_body_hash_from_str},
-        source::{DocumentType, IngestKind},
-        source_external_id::{CanonicalSourceExternalId, canonicalize_direct_standard_payload},
-    },
+    domain::source::{DocumentType, IngestKind},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+use serde_json::Value;
 
 use crate::{
     middleware::{RequestContext, map_app_error},
@@ -160,63 +156,27 @@ fn canonicalize_request(
         let request: CanonicalRegisterRequest = serde_json::from_value(value.clone())
             .map_err(|error| AppError::validation(format!("invalid canonical request: {error}")))?;
 
-        let title = request.title.trim().to_owned();
-        let external_id =
-            CanonicalSourceExternalId::parse_canonical_uri(request.external_id.trim())?
-                .canonical_uri();
-        if title.is_empty() {
-            return Err(AppError::validation("title is required"));
-        }
-
         return Ok((
-            RegisterSourceCommand {
-                external_id,
-                title,
-                summary: request.summary.and_then(trimmed_option),
-                document_type: match request.document_type {
+            RegisterSourceCommand::canonical(
+                request.external_id,
+                request.title,
+                request.summary,
+                match request.document_type {
                     CanonicalDocumentType::Text => DocumentType::Text,
                     CanonicalDocumentType::Markdown => DocumentType::Markdown,
                 },
-                authoritative_content: request.content,
-                source_metadata: request.metadata.unwrap_or_else(empty_object),
-                semantic_payload_hash: normalized_json_hash_from_str(raw_body)?,
-                original_standard_id: None,
-                raw_body_hash: None,
-                ingest_kind: IngestKind::Canonical,
-            },
+                request.content,
+                request.metadata.unwrap_or(Value::Object(Default::default())),
+                raw_body,
+            )?,
             IngestKind::Canonical,
         ));
     }
 
-    let standard = canonicalize_direct_standard_payload(value)?;
     Ok((
-        RegisterSourceCommand {
-            external_id: standard.external_id.canonical_uri(),
-            title: standard.title,
-            summary: None,
-            document_type: DocumentType::Json,
-            authoritative_content: raw_body.to_owned(),
-            source_metadata: json!({}),
-            semantic_payload_hash: normalized_json_hash_from_str(raw_body)?,
-            original_standard_id: Some(standard.original_standard_id),
-            raw_body_hash: Some(raw_body_hash_from_str(raw_body)),
-            ingest_kind: IngestKind::DirectStandard,
-        },
+        RegisterSourceCommand::direct_standard(value, raw_body)?,
         IngestKind::DirectStandard,
     ))
-}
-
-fn trimmed_option(value: String) -> Option<String> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_owned())
-    }
-}
-
-fn empty_object() -> Value {
-    Value::Object(Map::new())
 }
 
 fn is_canonical_shape(value: &Value) -> bool {
@@ -264,52 +224,3 @@ fn map_body_error(error: axum::Error) -> AppError {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use mod_memory::domain::source_external_id::{
-        DirectStandardProfile, canonicalize_direct_standard_payload,
-    };
-    use serde_json::json;
-
-    #[test]
-    fn classifies_open_badges_payloads() {
-        let payload = json!({
-            "@context": ["https://www.w3.org/ns/credentials/v2"],
-            "type": ["VerifiableCredential", "OpenBadgeCredential"],
-            "id": " urn:badge:1 ",
-            "issuer": {
-                "id": "https://issuer.example.org"
-            },
-            "name": " Rust Badge "
-        });
-
-        let standard = canonicalize_direct_standard_payload(&payload)
-            .expect("open badges payload should canonicalize");
-
-        assert_eq!(
-            standard.profile,
-            DirectStandardProfile::OpenBadgesAchievementCredential
-        );
-        assert_eq!(
-            standard.external_id.canonical_uri(),
-            "https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Abadge%3A1"
-        );
-        assert_eq!(standard.original_standard_id, "urn:badge:1");
-        assert_eq!(standard.title, "Rust Badge");
-    }
-
-    #[test]
-    fn rejects_shape_valid_but_unmappable_standard_payloads() {
-        let payload = json!({
-            "@context": ["https://www.w3.org/ns/credentials/v2"],
-            "type": ["VerifiableCredential"],
-            "id": "urn:example:1",
-            "name": "Example"
-        });
-
-        let error = canonicalize_direct_standard_payload(&payload)
-            .expect_err("unsupported standard must fail");
-
-        assert_eq!(error.error_code(), "INVALID_STANDARD_PAYLOAD");
-    }
-}

@@ -2981,6 +2981,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "repo_tests"
+version = "0.1.0"
+dependencies = [
+ "app_server",
+ "axum",
+ "core_infra",
+ "core_shared",
+ "mod_memory",
+ "serde_json",
+ "time",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "reqwest"
 version = "0.12.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3186,24 +3204,6 @@ dependencies = [
  "num-traits",
  "serde",
  "smallvec",
-]
-
-[[package]]
-name = "rust"
-version = "0.1.0"
-dependencies = [
- "app_server",
- "axum",
- "core_infra",
- "core_shared",
- "mod_memory",
- "serde_json",
- "time",
- "tokio",
- "tower",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

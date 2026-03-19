@@ -41,9 +41,9 @@ fn semantic_json_changes_produce_a_different_hash() {
 #[test]
 fn clr_formatting_only_variants_share_the_same_hash() {
     let compact =
-        include_str!("../../../tests/fixtures/register_source/replay_hashing/clr_compact.json");
+        include_str!("../../tests/fixtures/register_source/replay_hashing/clr_compact.json");
     let formatted =
-        include_str!("../../../tests/fixtures/register_source/replay_hashing/clr_pretty.json");
+        include_str!("../../tests/fixtures/register_source/replay_hashing/clr_pretty.json");
 
     let compact_hash = normalized_json_hash_from_str(compact).expect("compact CLR should hash");
     let formatted_hash =
@@ -55,10 +55,10 @@ fn clr_formatting_only_variants_share_the_same_hash() {
 #[test]
 fn open_badges_fixture_variants_share_the_same_hash() {
     let compact = include_str!(
-        "../../../tests/fixtures/register_source/replay_hashing/open_badges_compact.json"
+        "../../tests/fixtures/register_source/replay_hashing/open_badges_compact.json"
     );
     let formatted = include_str!(
-        "../../../tests/fixtures/register_source/replay_hashing/open_badges_pretty.json"
+        "../../tests/fixtures/register_source/replay_hashing/open_badges_pretty.json"
     );
 
     let compact_hash = normalized_json_hash_from_str(compact).expect("compact badge should hash");
@@ -71,12 +71,12 @@ fn open_badges_fixture_variants_share_the_same_hash() {
 #[test]
 fn fixture_semantic_changes_produce_different_hashes() {
     let open_badges = include_str!(
-        "../../../tests/fixtures/register_source/replay_hashing/open_badges_compact.json"
+        "../../tests/fixtures/register_source/replay_hashing/open_badges_compact.json"
     );
     let clr =
-        include_str!("../../../tests/fixtures/register_source/replay_hashing/clr_compact.json");
+        include_str!("../../tests/fixtures/register_source/replay_hashing/clr_compact.json");
     let clr_conflict =
-        include_str!("../../../tests/fixtures/register_source/replay_hashing/clr_conflict.json");
+        include_str!("../../tests/fixtures/register_source/replay_hashing/clr_conflict.json");
 
     let open_badges_hash =
         normalized_json_hash_from_str(open_badges).expect("badge payload should hash");
@@ -91,7 +91,7 @@ fn fixture_semantic_changes_produce_different_hashes() {
 #[test]
 fn normalized_hashing_is_deterministic_across_repeated_runs() {
     let payload = include_str!(
-        "../../../tests/fixtures/register_source/replay_hashing/open_badges_pretty.json"
+        "../../tests/fixtures/register_source/replay_hashing/open_badges_pretty.json"
     );
 
     let first = normalized_json_hash_from_str(payload).expect("first hash should succeed");

@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, path::Path};
 
 use app_server::{
     config::AppConfig,
@@ -159,10 +159,13 @@ async fn ready_returns_200_and_degraded_when_search_is_unavailable() {
 }
 
 fn load_contract() -> String {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let path = format!(
-        "{manifest_dir}/specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml"
-    );
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+        .parent()
+        .and_then(Path::parent)
+        .expect("expected workspace root")
+        .to_path_buf();
+    let path = workspace_root.join("specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml");
 
     fs::read_to_string(path).expect("contract file must exist")
 }

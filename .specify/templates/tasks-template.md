@@ -154,7 +154,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Documentation updates in docs/
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
-- [ ] TXXX [P] Additional unit tests as required in tests/unit/
+- [ ] TXXX [P] Additional crate-local unit tests as required near the owning crate
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
 

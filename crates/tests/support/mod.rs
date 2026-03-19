@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{fs, sync::Arc};
+use std::{fs, path::Path, sync::Arc};
 
 use app_server::{
     config::AppConfig,
@@ -18,17 +18,24 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 pub fn load_contract() -> String {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let path = format!(
-        "{manifest_dir}/specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml"
-    );
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+        .parent()
+        .and_then(Path::parent)
+        .expect("expected workspace root")
+        .to_path_buf();
+    let path = workspace_root.join("specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml");
 
     fs::read_to_string(path).expect("contract file must exist")
 }
 
 pub fn load_fixture(relative_path: &str) -> String {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let path = format!("{manifest_dir}/tests/fixtures/{relative_path}");
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let crate_root = manifest_dir
+        .parent()
+        .expect("expected crate root")
+        .to_path_buf();
+    let path = crate_root.join("tests/fixtures").join(relative_path);
 
     fs::read_to_string(path).expect("fixture file must exist")
 }
