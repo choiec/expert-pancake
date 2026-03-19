@@ -21,9 +21,10 @@ async fn memory_ingest_latency_stays_within_slo_thresholds() {
     let app = build_router(state.clone());
     let profile = load_profile();
 
-    let canonical_template: Value =
-        serde_json::from_str(include_str!("../fixtures/perf/canonical_markdown_small.json"))
-            .expect("canonical fixture must parse");
+    let canonical_template: Value = serde_json::from_str(include_str!(
+        "../fixtures/perf/canonical_markdown_small.json"
+    ))
+    .expect("canonical fixture must parse");
     let badge_template: Value =
         serde_json::from_str(include_str!("../fixtures/perf/open_badges_small.json"))
             .expect("badge fixture must parse");
@@ -41,19 +42,28 @@ async fn memory_ingest_latency_stays_within_slo_thresholds() {
         &app,
         &state,
         profile["registration_iterations"].as_u64().unwrap_or(20) as u32,
-        |index| unique_standard_payload(&badge_template, index, "urn:badge:perf", "Performance Badge"),
+        |index| {
+            unique_standard_payload(
+                &badge_template,
+                index,
+                "urn:badge:perf",
+                "Performance Badge",
+            )
+        },
     )
     .await;
     let clr_registration = run_registration_scenario(
         &app,
         &state,
         profile["registration_iterations"].as_u64().unwrap_or(20) as u32,
-        |index| unique_standard_payload(
-            &clr_template,
-            index,
-            "https://clr.example/credentials/perf",
-            "Performance CLR",
-        ),
+        |index| {
+            unique_standard_payload(
+                &clr_template,
+                index,
+                "https://clr.example/credentials/perf",
+                "Performance CLR",
+            )
+        },
     )
     .await;
 
@@ -65,7 +75,9 @@ async fn memory_ingest_latency_stays_within_slo_thresholds() {
     .await;
     assert_eq!(retrieval_seed.0, StatusCode::CREATED);
     let retrieval_source_id = retrieval_seed.1["source_id"].as_str().expect("source id");
-    let retrieval_urn = retrieval_seed.1["memory_items"][0]["urn"].as_str().expect("urn");
+    let retrieval_urn = retrieval_seed.1["memory_items"][0]["urn"]
+        .as_str()
+        .expect("urn");
     drain_worker(&state).await;
 
     let large_source_retrieval = run_get_scenario(
@@ -91,18 +103,30 @@ async fn memory_ingest_latency_stays_within_slo_thresholds() {
 
     assert_report(
         &canonical_registration,
-        profile["registration_threshold_ms"].as_u64().unwrap_or(5_000) as u128,
-        profile["registration_threshold_ms"].as_u64().unwrap_or(5_000) as u128,
+        profile["registration_threshold_ms"]
+            .as_u64()
+            .unwrap_or(5_000) as u128,
+        profile["registration_threshold_ms"]
+            .as_u64()
+            .unwrap_or(5_000) as u128,
     );
     assert_report(
         &badge_registration,
-        profile["registration_threshold_ms"].as_u64().unwrap_or(5_000) as u128,
-        profile["registration_threshold_ms"].as_u64().unwrap_or(5_000) as u128,
+        profile["registration_threshold_ms"]
+            .as_u64()
+            .unwrap_or(5_000) as u128,
+        profile["registration_threshold_ms"]
+            .as_u64()
+            .unwrap_or(5_000) as u128,
     );
     assert_report(
         &clr_registration,
-        profile["registration_threshold_ms"].as_u64().unwrap_or(5_000) as u128,
-        profile["registration_threshold_ms"].as_u64().unwrap_or(5_000) as u128,
+        profile["registration_threshold_ms"]
+            .as_u64()
+            .unwrap_or(5_000) as u128,
+        profile["registration_threshold_ms"]
+            .as_u64()
+            .unwrap_or(5_000) as u128,
     );
     assert_report(
         &memory_item_retrieval,
@@ -111,8 +135,12 @@ async fn memory_ingest_latency_stays_within_slo_thresholds() {
     );
     assert_report(
         &large_source_retrieval,
-        profile["source_retrieval_threshold_ms"].as_u64().unwrap_or(200) as u128,
-        profile["source_retrieval_threshold_ms"].as_u64().unwrap_or(200) as u128,
+        profile["source_retrieval_threshold_ms"]
+            .as_u64()
+            .unwrap_or(200) as u128,
+        profile["source_retrieval_threshold_ms"]
+            .as_u64()
+            .unwrap_or(200) as u128,
     );
     assert_report(
         &search,
@@ -139,11 +167,23 @@ async fn memory_ingest_latency_stays_within_slo_thresholds() {
         memory_item_retrieval.total_requests
     );
     assert_eq!(
-        metric_count(&metrics, "/sources/{source-id}", 200, Some("markdown"), None),
+        metric_count(
+            &metrics,
+            "/sources/{source-id}",
+            200,
+            Some("markdown"),
+            None
+        ),
         large_source_retrieval.total_requests
     );
     assert_eq!(
-        metric_count(&metrics, "/search/memory-items", 200, Some("markdown"), None),
+        metric_count(
+            &metrics,
+            "/search/memory-items",
+            200,
+            Some("markdown"),
+            None
+        ),
         search.total_requests
     );
 }
@@ -190,7 +230,8 @@ fn assert_report(report: &ScenarioReport, p95_max_ms: u128, p99_max_ms: u128) {
     assert!(p95 <= p95_max_ms, "p95 {p95}ms exceeded {p95_max_ms}ms");
     assert!(p99 <= p99_max_ms, "p99 {p99}ms exceeded {p99_max_ms}ms");
     assert_eq!(
-        report.failures, 0,
+        report.failures,
+        0,
         "{} error rate exceeded 0: {}",
         report.name,
         report.error_rate()
@@ -305,8 +346,9 @@ fn inflate_canonical_markdown(template: &Value, index: u32, profile: &Value) -> 
     let target_bytes = profile["canonical_markdown_target_bytes"]
         .as_u64()
         .unwrap_or(98_304) as usize;
-    payload["external-id"] =
-        json!(format!("https://api.cherry-pick.net/cc/v1p3/example.edu:perf-markdown-{index}"));
+    payload["external-id"] = json!(format!(
+        "https://api.cherry-pick.net/cc/v1p3/example.edu:perf-markdown-{index}"
+    ));
     payload["title"] = json!(format!("Performance Markdown {index}"));
 
     let seed = payload["content"]

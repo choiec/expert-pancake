@@ -10,7 +10,9 @@ use core_shared::{AppError, AppResult, IdGenerator};
 
 use crate::domain::event::GraphProjectionEvent;
 use crate::domain::normalization::{NormalizationInput, normalize_source};
-use crate::domain::source::{CANONICAL_ID_VERSION, DocumentType, IngestKind, NewSource, SourceSystemMetadata};
+use crate::domain::source::{
+    CANONICAL_ID_VERSION, DocumentType, IngestKind, NewSource, SourceSystemMetadata,
+};
 use crate::domain::source_identity::deterministic_source_id;
 use crate::infra::graph::GraphProjectionPort;
 use crate::infra::indexer::{IndexingPort, PublicIndexingStatus};
@@ -202,11 +204,7 @@ impl RegisterSourceService {
                     decision_reason = decision_reason,
                     "source registration created"
                 );
-                Ok(Self::into_result(
-                    bundle,
-                    false,
-                    decision_reason.to_owned(),
-                ))
+                Ok(Self::into_result(bundle, false, decision_reason.to_owned()))
             }
         }
     }

@@ -118,11 +118,25 @@ async fn histogram_metrics_cover_all_public_endpoints_with_bounded_labels() {
         1
     );
     assert_eq!(
-        metric_count(&metrics, "/memory-items/{urn}", 200, Some("markdown"), None, None),
+        metric_count(
+            &metrics,
+            "/memory-items/{urn}",
+            200,
+            Some("markdown"),
+            None,
+            None
+        ),
         1
     );
     assert_eq!(
-        metric_count(&metrics, "/search/memory-items", 200, Some("json"), None, None),
+        metric_count(
+            &metrics,
+            "/search/memory-items",
+            200,
+            Some("json"),
+            None,
+            None
+        ),
         1
     );
 

@@ -34,7 +34,8 @@ async fn outbox_rows_can_rehydrate_projection_inputs_from_authoritative_rows() {
 
     let result = service
         .execute(RegisterSourceCommand {
-            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:projection-source".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:projection-source"
+                .to_owned(),
             title: "Projection".to_owned(),
             summary: None,
             document_type: DocumentType::Markdown,
@@ -85,13 +86,28 @@ async fn outbox_rows_can_rehydrate_projection_inputs_from_authoritative_rows() {
     assert_eq!(projection_inputs.len(), result.memory_items.len());
     assert_eq!(projection_inputs[0].urn, projection.memory_items[0].urn);
     assert_eq!(projection_inputs[0].source_id, projection.source.source_id);
-    assert_eq!(projection_inputs[0].sequence, projection.memory_items[0].sequence);
+    assert_eq!(
+        projection_inputs[0].sequence,
+        projection.memory_items[0].sequence
+    );
     assert_eq!(projection.source.document_type, "markdown");
     assert!(projection.memory_items[0].content.starts_with("# Intro"));
-    assert_eq!(projection_inputs[0].document_type, projection.source.document_type);
-    assert_eq!(projection_inputs[0].content_hash, projection.memory_items[0].content_hash);
-    assert_eq!(projection_inputs[0].created_at, projection.memory_items[0].created_at);
-    assert_eq!(projection_inputs[0].updated_at, projection.memory_items[0].updated_at);
+    assert_eq!(
+        projection_inputs[0].document_type,
+        projection.source.document_type
+    );
+    assert_eq!(
+        projection_inputs[0].content_hash,
+        projection.memory_items[0].content_hash
+    );
+    assert_eq!(
+        projection_inputs[0].created_at,
+        projection.memory_items[0].created_at
+    );
+    assert_eq!(
+        projection_inputs[0].updated_at,
+        projection.memory_items[0].updated_at
+    );
     assert_eq!(
         projection_inputs[0].content_preview,
         projection.memory_items[0].content

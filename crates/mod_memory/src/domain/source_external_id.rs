@@ -188,10 +188,10 @@ fn trusted_domain_for_profile(
         }
     }
 
-    Err(AppError::validation(
-        "trusted direct-standard source_domain could not be derived",
+    Err(
+        AppError::validation("trusted direct-standard source_domain could not be derived")
+            .with_error_code("DIRECT_STANDARD_REJECTED_UNTRUSTED_DOMAIN"),
     )
-    .with_error_code("DIRECT_STANDARD_REJECTED_UNTRUSTED_DOMAIN"))
 }
 
 fn nested_string(object: &Map<String, Value>, path: &str) -> AppResult<Option<String>> {
@@ -253,11 +253,7 @@ fn has_type(types: &[String], markers: &[&str]) -> bool {
 fn ensure_supported_standard_version(standard: &str, version: &str) -> AppResult<()> {
     let supported = matches!(
         (standard, version),
-        ("cc", "v1p3")
-            | ("case", "v1p0")
-            | ("qti", "v3p0")
-            | ("ob", "v2p0")
-            | ("clr", "v2p0")
+        ("cc", "v1p3") | ("case", "v1p0") | ("qti", "v3p0") | ("ob", "v2p0") | ("clr", "v2p0")
     );
     if supported {
         Ok(())
@@ -275,12 +271,16 @@ fn percent_decode_utf8(input: &str) -> AppResult<String> {
     while index < bytes.len() {
         if bytes[index] == b'%' {
             if index + 2 >= bytes.len() {
-                return Err(AppError::validation("external_id contains an invalid percent escape"));
+                return Err(AppError::validation(
+                    "external_id contains an invalid percent escape",
+                ));
             }
-            let hex = std::str::from_utf8(&bytes[index + 1..index + 3])
-                .map_err(|_| AppError::validation("external_id contains an invalid percent escape"))?;
-            let value = u8::from_str_radix(hex, 16)
-                .map_err(|_| AppError::validation("external_id contains an invalid percent escape"))?;
+            let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).map_err(|_| {
+                AppError::validation("external_id contains an invalid percent escape")
+            })?;
+            let value = u8::from_str_radix(hex, 16).map_err(|_| {
+                AppError::validation("external_id contains an invalid percent escape")
+            })?;
             output.push(value);
             index += 3;
         } else {

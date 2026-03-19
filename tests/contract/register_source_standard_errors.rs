@@ -20,7 +20,10 @@ async fn untrusted_standard_domain_returns_specific_error_without_state() {
     .await;
     let payload = assert_status_json(response, StatusCode::BAD_REQUEST).await;
 
-    assert_eq!(payload["error_code"], "DIRECT_STANDARD_REJECTED_UNTRUSTED_DOMAIN");
+    assert_eq!(
+        payload["error_code"],
+        "DIRECT_STANDARD_REJECTED_UNTRUSTED_DOMAIN"
+    );
     assert!(
         db.lookup_source_by_external_id("urn:example:badge:matrix-invalid")
             .is_none()

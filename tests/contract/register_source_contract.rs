@@ -41,8 +41,14 @@ async fn canonical_registration_returns_created_shape() {
     assert_eq!(payload["document_type"], "markdown");
     assert_eq!(payload["indexing_status"], "queued");
     assert_eq!(payload["memory_items"][0]["unit_type"], "section");
-    assert_eq!(payload["source_metadata"]["system"]["canonical_id_version"], "v1");
-    assert_eq!(payload["source_metadata"]["system"]["ingest_kind"], "canonical");
+    assert_eq!(
+        payload["source_metadata"]["system"]["canonical_id_version"],
+        "v1"
+    );
+    assert_eq!(
+        payload["source_metadata"]["system"]["ingest_kind"],
+        "canonical"
+    );
     assert!(payload["source_metadata"]["system"]["semantic_payload_hash"].is_string());
 }
 

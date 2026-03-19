@@ -173,7 +173,10 @@ struct SharedWriter(Arc<Mutex<Vec<u8>>>);
 
 impl Write for SharedWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.lock().expect("log buffer poisoned").extend_from_slice(buf);
+        self.0
+            .lock()
+            .expect("log buffer poisoned")
+            .extend_from_slice(buf);
         Ok(buf.len())
     }
 

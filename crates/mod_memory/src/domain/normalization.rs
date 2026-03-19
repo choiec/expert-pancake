@@ -89,7 +89,9 @@ pub fn normalize_source_domain(input: &str) -> AppResult<String> {
     let parsed = Url::parse(&candidate)
         .map_err(|error| AppError::validation(format!("invalid source_domain: {error}")))?;
     if !parsed.username().is_empty() || parsed.password().is_some() {
-        return Err(AppError::validation("source_domain must not include userinfo"));
+        return Err(AppError::validation(
+            "source_domain must not include userinfo",
+        ));
     }
     if parsed.query().is_some() {
         return Err(AppError::validation(
@@ -97,7 +99,9 @@ pub fn normalize_source_domain(input: &str) -> AppResult<String> {
         ));
     }
     if parsed.fragment().is_some() {
-        return Err(AppError::validation("source_domain must not include fragments"));
+        return Err(AppError::validation(
+            "source_domain must not include fragments",
+        ));
     }
     if parsed.path() != "/" && !parsed.path().is_empty() {
         return Err(AppError::validation(

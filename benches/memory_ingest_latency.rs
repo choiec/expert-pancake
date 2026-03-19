@@ -19,14 +19,20 @@ async fn main() {
     let db = Arc::new(InMemorySurrealDb::new());
     let state = AppState::for_memory_ingest_test(AppConfig::for_test(), ProbeSnapshot::ready(), db);
     let app = build_router(state.clone());
-    let profile: Value = serde_json::from_str(include_str!("../tests/fixtures/perf/workload_profile.json"))
-        .expect("workload profile must parse");
-    let canonical_template: Value = serde_json::from_str(include_str!("../tests/fixtures/perf/canonical_markdown_small.json"))
-        .expect("canonical fixture must parse");
-    let badge_template: Value = serde_json::from_str(include_str!("../tests/fixtures/perf/open_badges_small.json"))
-        .expect("badge fixture must parse");
-    let clr_template: Value = serde_json::from_str(include_str!("../tests/fixtures/perf/clr_small.json"))
-        .expect("clr fixture must parse");
+    let profile: Value =
+        serde_json::from_str(include_str!("../tests/fixtures/perf/workload_profile.json"))
+            .expect("workload profile must parse");
+    let canonical_template: Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/perf/canonical_markdown_small.json"
+    ))
+    .expect("canonical fixture must parse");
+    let badge_template: Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/perf/open_badges_small.json"
+    ))
+    .expect("badge fixture must parse");
+    let clr_template: Value =
+        serde_json::from_str(include_str!("../tests/fixtures/perf/clr_small.json"))
+            .expect("clr fixture must parse");
 
     let canonical = run_registration_report(
         &app,
@@ -46,18 +52,31 @@ async fn main() {
         &app,
         &state,
         profile["benchmark_iterations"].as_u64().unwrap_or(10) as u32,
-        |index| unique_standard_payload(
-            &clr_template,
-            index,
-            "https://clr.example/credentials/bench",
-            "Bench CLR",
-        ),
+        |index| {
+            unique_standard_payload(
+                &clr_template,
+                index,
+                "https://clr.example/credentials/bench",
+                "Bench CLR",
+            )
+        },
     )
     .await;
 
-    let retrieval_seed = post_json(&app, "/sources/register", inflate_canonical_markdown(&canonical_template, 50_000, &profile)).await;
-    let source_id = retrieval_seed["source_id"].as_str().expect("source id").to_owned();
-    let urn = retrieval_seed["memory_items"][0]["urn"].as_str().expect("urn").to_owned();
+    let retrieval_seed = post_json(
+        &app,
+        "/sources/register",
+        inflate_canonical_markdown(&canonical_template, 50_000, &profile),
+    )
+    .await;
+    let source_id = retrieval_seed["source_id"]
+        .as_str()
+        .expect("source id")
+        .to_owned();
+    let urn = retrieval_seed["memory_items"][0]["urn"]
+        .as_str()
+        .expect("urn")
+        .to_owned();
     drain_worker(&state).await;
 
     seed_search_corpus(&app, &state, &canonical_template, &profile).await;
@@ -214,7 +233,12 @@ async fn seed_search_corpus(
     let sources = profile["search_corpus_sources"].as_u64().unwrap_or(250) as u32;
 
     for index in 0..sources {
-        let response = post_json(app, "/sources/register", inflate_search_corpus_payload(template, index)).await;
+        let response = post_json(
+            app,
+            "/sources/register",
+            inflate_search_corpus_payload(template, index),
+        )
+        .await;
         assert!(response["source_id"].is_string());
         drain_worker(state).await;
     }
@@ -222,7 +246,9 @@ async fn seed_search_corpus(
 
 fn inflate_canonical_markdown(template: &Value, index: u32, profile: &Value) -> Value {
     let mut payload = template.clone();
-    let target_bytes = profile["canonical_markdown_target_bytes"].as_u64().unwrap_or(98_304) as usize;
+    let target_bytes = profile["canonical_markdown_target_bytes"]
+        .as_u64()
+        .unwrap_or(98_304) as usize;
     payload["external-id"] = json!(format!("bench-markdown-{index}"));
     payload["title"] = json!(format!("Bench Markdown {index}"));
 

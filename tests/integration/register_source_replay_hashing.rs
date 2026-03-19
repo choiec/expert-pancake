@@ -52,8 +52,7 @@ fn build_service(db: Arc<InMemorySurrealDb>) -> RegisterSourceService {
 
 const BADGE_EXTERNAL_ID: &str =
     "https://api.cherry-pick.net/ob/v2p0/issuer.example.org:urn%3Abadge%3A001";
-const CLR_EXTERNAL_ID: &str =
-    "https://api.cherry-pick.net/clr/v2p0/issuer.example.org:https%3A%2F%2Fclr.example%2Fcredentials%2F123";
+const CLR_EXTERNAL_ID: &str = "https://api.cherry-pick.net/clr/v2p0/issuer.example.org:https%3A%2F%2Fclr.example%2Fcredentials%2F123";
 
 #[tokio::test]
 async fn formatting_only_replay_returns_the_first_authoritative_json_body() {

@@ -44,7 +44,8 @@ async fn failed_authoritative_commit_leaves_no_partial_state() {
 
     let error = service
         .execute(RegisterSourceCommand {
-            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:source-rollback".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:source-rollback"
+                .to_owned(),
             title: "Rollback".to_owned(),
             summary: None,
             document_type: DocumentType::Text,
@@ -59,7 +60,12 @@ async fn failed_authoritative_commit_leaves_no_partial_state() {
         .expect_err("simulated transaction failure should surface");
 
     assert_eq!(error.kind(), ErrorCode::StorageUnavailable);
-    assert!(db.lookup_source_by_external_id("https://api.cherry-pick.net/cc/v1p3/example.edu:source-rollback").is_none());
+    assert!(
+        db.lookup_source_by_external_id(
+            "https://api.cherry-pick.net/cc/v1p3/example.edu:source-rollback"
+        )
+        .is_none()
+    );
 }
 
 #[test]
@@ -117,7 +123,12 @@ fn duplicate_sequence_and_urn_constraints_are_enforced_atomically() {
         )
         .expect_err("duplicate sequence should fail");
     assert_eq!(duplicate_sequence_error.kind(), ErrorCode::Conflict);
-    assert!(db.lookup_source_by_external_id("https://api.cherry-pick.net/cc/v1p3/example.edu:sequence-source").is_none());
+    assert!(
+        db.lookup_source_by_external_id(
+            "https://api.cherry-pick.net/cc/v1p3/example.edu:sequence-source"
+        )
+        .is_none()
+    );
 
     db.commit_registration(
         source.clone(),
@@ -165,5 +176,10 @@ fn duplicate_sequence_and_urn_constraints_are_enforced_atomically() {
         )
         .expect_err("duplicate URN should fail");
     assert_eq!(duplicate_urn_error.kind(), ErrorCode::Conflict);
-    assert!(db.lookup_source_by_external_id("https://api.cherry-pick.net/cc/v1p3/example.edu:urn-source").is_none());
+    assert!(
+        db.lookup_source_by_external_id(
+            "https://api.cherry-pick.net/cc/v1p3/example.edu:urn-source"
+        )
+        .is_none()
+    );
 }

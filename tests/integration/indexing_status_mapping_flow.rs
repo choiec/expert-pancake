@@ -97,7 +97,8 @@ async fn public_indexing_status_maps_from_queued_to_indexed() {
 
     let result = register
         .execute(RegisterSourceCommand {
-            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:status-map-001".to_owned(),
+            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:status-map-001"
+                .to_owned(),
             title: "Status map".to_owned(),
             summary: None,
             document_type: DocumentType::Text,
@@ -173,7 +174,9 @@ async fn dead_letter_maps_to_deferred_without_exposing_internal_state() {
 
     let result = register
         .execute(RegisterSourceCommand {
-            external_id: "https://api.cherry-pick.net/cc/v1p3/example.edu:status-map-dead-letter-001".to_owned(),
+            external_id:
+                "https://api.cherry-pick.net/cc/v1p3/example.edu:status-map-dead-letter-001"
+                    .to_owned(),
             title: "Dead letter".to_owned(),
             summary: None,
             document_type: DocumentType::Text,
@@ -214,7 +217,13 @@ async fn dead_letter_maps_to_deferred_without_exposing_internal_state() {
     let public_source = get_json(&app, &format!("/sources/{}", result.source_id)).await;
     assert_eq!(public_source.0, StatusCode::OK);
     assert_eq!(public_source.1["indexing_status"], "deferred");
-    for internal in ["pending", "processing", "retryable", "completed", "dead_letter"] {
+    for internal in [
+        "pending",
+        "processing",
+        "retryable",
+        "completed",
+        "dead_letter",
+    ] {
         assert_ne!(public_source.1["indexing_status"], internal);
     }
 }

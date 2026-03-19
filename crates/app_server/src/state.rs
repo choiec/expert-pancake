@@ -5,28 +5,9 @@ use std::{
 };
 
 use core_infra::surrealdb::InMemorySurrealDb;
-use core_infra::{MeilisearchService, NoopGraphProjectionAdapter, SurrealDbService};
-use core_shared::{DefaultIdGenerator, IdGenerator, StartupError};
-use mod_memory::{
-    application::{
-        get_memory_item::GetMemoryItemService,
-        get_source::GetSourceService,
-        index_memory_items::{IndexMemoryItemsService, RetryPolicy},
-        register_source::{RegisterSourceService, SystemClock},
-        search_memory_items::SearchMemoryItemsService,
-    },
-    infra::{
-        indexer::OutboxOnlyIndexer,
-        meili_indexer::{
-            InMemoryIndexingOutboxRepository, InMemoryMeiliProjectionIndex,
-            RuntimeIndexingOutboxRepository, RuntimeMeiliProjectionIndex,
-        },
-        surreal_memory_query::{RuntimeSurrealMemoryQueryRepository, SurrealMemoryQueryRepository},
-        surreal_memory_repo::{RuntimeSurrealMemoryRepository, SurrealMemoryRepository},
-        surreal_source_query::{RuntimeSurrealSourceQueryRepository, SurrealSourceQueryRepository},
-        surreal_source_repo::{RuntimeSurrealSourceRepository, SurrealSourceRepository},
-    },
-};
+use core_infra::{MeilisearchService, SurrealDbService};
+use core_shared::StartupError;
+use mod_memory::MemoryModule;
 use serde::{Deserialize, Serialize};
 
 use crate::config::AppConfig;
@@ -43,18 +24,9 @@ struct AppStateInner {
     config: AppConfig,
     surrealdb: Option<Arc<SurrealDbService>>,
     meilisearch: Option<Arc<MeilisearchService>>,
-    memory_ingest: Option<MemoryIngestServices>,
+    memory_ingest: Option<MemoryModule>,
     metrics: RequestMetrics,
     probe_mode: ProbeMode,
-}
-
-#[derive(Clone)]
-pub struct MemoryIngestServices {
-    register_source: Arc<RegisterSourceService>,
-    get_memory_item: Arc<GetMemoryItemService>,
-    get_source: Arc<GetSourceService>,
-    search_memory_items: Arc<SearchMemoryItemsService>,
-    index_memory_items: Arc<IndexMemoryItemsService>,
 }
 
 #[derive(Debug, Clone)]
@@ -127,11 +99,10 @@ impl AppState {
         let surrealdb = Arc::new(infrastructure.surrealdb);
         let meilisearch = Arc::new(infrastructure.meilisearch);
         let search_enabled = config.infrastructure.meilisearch.enabled;
-        let memory_ingest = MemoryIngestServices::runtime(
+        let memory_ingest = MemoryModule::runtime(
             surrealdb.clone(),
             meilisearch.clone(),
             search_enabled,
-            Arc::new(DefaultIdGenerator) as Arc<dyn IdGenerator>,
             config.timeouts.normalization_timeout,
         );
 
@@ -174,10 +145,9 @@ impl AppState {
         db: Arc<InMemorySurrealDb>,
         projection_available: bool,
     ) -> Self {
-        let memory_ingest = MemoryIngestServices::fixture(
+        let memory_ingest = MemoryModule::fixture(
             db,
             projection_available,
-            Arc::new(DefaultIdGenerator) as Arc<dyn IdGenerator>,
             config.timeouts.normalization_timeout,
         );
 
@@ -218,7 +188,7 @@ impl AppState {
         }
     }
 
-    pub fn memory_ingest(&self) -> Option<&MemoryIngestServices> {
+    pub fn memory_ingest(&self) -> Option<&MemoryModule> {
         self.inner.memory_ingest.as_ref()
     }
 
@@ -299,126 +269,6 @@ impl MetricsLabels {
 
     pub fn insert_response_extension(self, response: &mut axum::response::Response) {
         response.extensions_mut().insert(self);
-    }
-}
-
-impl MemoryIngestServices {
-    fn runtime(
-        surrealdb: Arc<SurrealDbService>,
-        meilisearch: Arc<MeilisearchService>,
-        search_enabled: bool,
-        id_generator: Arc<dyn IdGenerator>,
-        normalization_timeout: Duration,
-    ) -> Self {
-        let search_available = Arc::new(move || search_enabled);
-        let register_source = Arc::new(RegisterSourceService::new(
-            Arc::new(RuntimeSurrealSourceRepository::new(
-                surrealdb.clone(),
-                search_available.clone(),
-            )),
-            Arc::new(RuntimeSurrealMemoryRepository::new(
-                surrealdb.clone(),
-                search_available.clone(),
-            )),
-            Arc::new(OutboxOnlyIndexer::new(search_enabled)),
-            Arc::new(NoopGraphProjectionAdapter),
-            Arc::new(SystemClock),
-            id_generator.clone(),
-            normalization_timeout,
-        ));
-        let get_memory_item = Arc::new(GetMemoryItemService::new(Arc::new(
-            RuntimeSurrealMemoryQueryRepository::new(surrealdb.clone()),
-        )));
-        let get_source = Arc::new(GetSourceService::new(Arc::new(
-            RuntimeSurrealSourceQueryRepository::new(surrealdb.clone(), search_available),
-        )));
-        let projection_index = Arc::new(RuntimeMeiliProjectionIndex::new(meilisearch));
-        let search_memory_items = Arc::new(SearchMemoryItemsService::new(projection_index.clone()));
-        let index_memory_items = Arc::new(IndexMemoryItemsService::new(
-            Arc::new(RuntimeIndexingOutboxRepository::new(surrealdb.clone())),
-            projection_index,
-            Arc::new(SystemClock),
-            RetryPolicy::default(),
-        ));
-
-        Self {
-            register_source,
-            get_memory_item,
-            get_source,
-            search_memory_items,
-            index_memory_items,
-        }
-    }
-
-    fn fixture(
-        db: Arc<InMemorySurrealDb>,
-        projection_available: bool,
-        id_generator: Arc<dyn IdGenerator>,
-        normalization_timeout: Duration,
-    ) -> Self {
-        let register_source = Arc::new(RegisterSourceService::new(
-            Arc::new(SurrealSourceRepository::new(db.clone())),
-            Arc::new(SurrealMemoryRepository::new(db.clone())),
-            Arc::new(OutboxOnlyIndexer::new(db.search_available())),
-            Arc::new(NoopGraphProjectionAdapter),
-            Arc::new(SystemClock),
-            id_generator,
-            normalization_timeout,
-        ));
-        let get_memory_item = Arc::new(GetMemoryItemService::new(Arc::new(
-            SurrealMemoryQueryRepository::new(db.clone()),
-        )));
-        let get_source = Arc::new(GetSourceService::new(Arc::new(
-            SurrealSourceQueryRepository::new(db.clone()),
-        )));
-        let projection_index = Arc::new(InMemoryMeiliProjectionIndex::new());
-        projection_index.set_available(projection_available);
-        let search_memory_items = Arc::new(SearchMemoryItemsService::new(projection_index.clone()));
-        let index_memory_items = Arc::new(IndexMemoryItemsService::new(
-            Arc::new(InMemoryIndexingOutboxRepository::new(db)),
-            projection_index,
-            Arc::new(SystemClock),
-            RetryPolicy::default(),
-        ));
-
-        Self {
-            register_source,
-            get_memory_item,
-            get_source,
-            search_memory_items,
-            index_memory_items,
-        }
-    }
-
-    pub fn register_source(&self) -> Arc<RegisterSourceService> {
-        self.register_source.clone()
-    }
-
-    pub fn get_memory_item(&self) -> Arc<GetMemoryItemService> {
-        self.get_memory_item.clone()
-    }
-
-    pub fn get_source(&self) -> Arc<GetSourceService> {
-        self.get_source.clone()
-    }
-
-    pub fn search_memory_items(&self) -> Arc<SearchMemoryItemsService> {
-        self.search_memory_items.clone()
-    }
-
-    pub fn index_memory_items_service(&self) -> Arc<IndexMemoryItemsService> {
-        self.index_memory_items.clone()
-    }
-
-    pub async fn index_memory_items(&self) {
-        self.index_memory_items.clone().run_forever().await;
-    }
-}
-
-impl std::fmt::Debug for MemoryIngestServices {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MemoryIngestServices")
-            .finish_non_exhaustive()
     }
 }
 

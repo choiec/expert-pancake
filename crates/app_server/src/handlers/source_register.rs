@@ -161,8 +161,9 @@ fn canonicalize_request(
             .map_err(|error| AppError::validation(format!("invalid canonical request: {error}")))?;
 
         let title = request.title.trim().to_owned();
-        let external_id = CanonicalSourceExternalId::parse_canonical_uri(request.external_id.trim())?
-            .canonical_uri();
+        let external_id =
+            CanonicalSourceExternalId::parse_canonical_uri(request.external_id.trim())?
+                .canonical_uri();
         if title.is_empty() {
             return Err(AppError::validation("title is required"));
         }
@@ -276,6 +277,9 @@ mod tests {
             "@context": ["https://www.w3.org/ns/credentials/v2"],
             "type": ["VerifiableCredential", "OpenBadgeCredential"],
             "id": " urn:badge:1 ",
+            "issuer": {
+                "id": "https://issuer.example.org"
+            },
             "name": " Rust Badge "
         });
 

@@ -1,7 +1,7 @@
-# Specification Quality Checklist: Canonical Source External ID and Direct-Standard Ingest Alignment
+# Specification Quality Checklist: Canonical Source External ID
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
-**Created**: 2026-03-18  
+**Created**: 2026-03-19  
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,5 +31,6 @@
 
 ## Notes
 
-- Validation completed on 2026-03-18.
-- The spec intentionally defines behavior and artifact alignment only; standard-specific derivation mechanics are deferred to planning.
+- Validation completed on 2026-03-19.
+- The spec was updated instead of creating a new feature branch because this work item already exists as `002-canonical-source-external-id`.
+- Repository-specific ownership and test-placement sections are intentional to preserve modular monolith boundaries without prescribing implementation details.

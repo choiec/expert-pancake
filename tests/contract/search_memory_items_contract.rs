@@ -161,8 +161,9 @@ async fn search_contract_returns_structured_503_when_projection_is_unavailable()
 
 fn load_contract() -> String {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let path =
-        format!("{manifest_dir}/specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml");
+    let path = format!(
+        "{manifest_dir}/specs/002-canonical-source-external-id/contracts/memory-ingest.openapi.yaml"
+    );
     fs::read_to_string(path).expect("contract file must exist")
 }
 

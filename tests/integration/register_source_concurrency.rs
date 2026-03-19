@@ -38,7 +38,9 @@ async fn duplicate_registration_race_returns_created_and_replay_without_duplicat
     assert!(statuses.contains(&StatusCode::OK));
     assert_eq!(left_payload["source_id"], right_payload["source_id"]);
     assert!(
-        db.lookup_source_by_external_id("https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01")
-            .is_some()
+        db.lookup_source_by_external_id(
+            "https://api.cherry-pick.net/cc/v1p3/nebooks.co.kr:eng3-ch01"
+        )
+        .is_some()
     );
 }

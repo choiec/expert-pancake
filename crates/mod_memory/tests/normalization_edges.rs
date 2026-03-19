@@ -72,7 +72,8 @@ fn direct_standard_json_creates_one_json_document_item() {
         Uuid::parse_str("cccccccc-cccc-4ccc-8ccc-cccccccccccc").expect("valid source id");
     let created_at = OffsetDateTime::from_unix_timestamp(1_700_000_002).expect("valid timestamp");
     let generator = DefaultIdGenerator;
-    let raw_body = include_str!("../fixtures/register_source/replay_hashing/clr_compact.json");
+    let raw_body =
+        include_str!("../../../tests/fixtures/register_source/replay_hashing/clr_compact.json");
 
     let items = normalize_source(
         &NormalizationInput {
