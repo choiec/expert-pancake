@@ -9,6 +9,30 @@ use serde_json::Value;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
+pub struct SurrealDbClient {
+    pub url: String,
+    pub namespace: String,
+    pub database: String,
+    pub username: String,
+}
+
+impl SurrealDbClient {
+    pub fn new(
+        url: impl Into<String>,
+        namespace: impl Into<String>,
+        database: impl Into<String>,
+        username: impl Into<String>,
+    ) -> Self {
+        Self {
+            url: url.into(),
+            namespace: namespace.into(),
+            database: database.into(),
+            username: username.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersistedSourceRecord {
     pub source_id: Uuid,

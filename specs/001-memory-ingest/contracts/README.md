@@ -18,6 +18,7 @@ This directory contains the merged public HTTP contract for the memory-ingest sl
 - Authoritative source identity uses canonical project-owned `external_id` values.
 - Internal `source_id` is deterministic and distinct from `external_id`.
 - Direct-standard ingest returns canonical identity while preserving original upstream identifiers only as provenance under `source_metadata.system`.
+- Direct-standard Open Badges and CLR payloads are pinned to the official 1EdTech 3.0 / 2.0 JSON-LD credential envelopes used by this repository.
 - Replay and conflict decisions use canonical identity plus semantic payload hash, not formatting-only raw-body differences.
 - Retrieval is authoritative; search remains a projection-only surface.
 - Public contracts do not expose migration-only aliases or compatibility fields.

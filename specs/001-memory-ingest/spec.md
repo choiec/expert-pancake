@@ -22,12 +22,13 @@ The expected outcome is that equivalent requests converge on the same logical so
 
 ## Goals
 
-- Accept canonical/manual and direct-standard ingest through `POST /sources/register`.
-- Normalize accepted content into deterministic `MemoryItem` records.
-- Persist authoritative `Source` and `MemoryItem` state before returning success.
-- Resolve replay and conflict decisions from canonical identity plus semantic payload hash.
-- Keep public `external_id` canonical and preserve original standard identifiers only as provenance.
-- Expose consistent retrieval, search, health, and readiness contracts.
+- **G1**: Accept canonical/manual and direct-standard ingest through `POST /sources/register`.
+- **G2**: Normalize accepted content into deterministic `MemoryItem` records.
+- **G3**: Persist authoritative `Source` and `MemoryItem` state before returning success.
+- **G4**: Resolve replay, conflict, and authoritative retrieval decisions from canonical identity plus semantic payload hash.
+- **G5**: Keep search explicitly non-authoritative while still exposing a usable projection API.
+- **G6**: Expose consistent retrieval, search, health, readiness, and operator-facing documentation contracts.
+- **G7**: Keep the vertical slice runnable and verifiable end-to-end through documented quickstart and smoke flows.
 
 ## Non-goals
 
@@ -116,6 +117,21 @@ A consumer searches memory-item projections while authoritative replay and retri
 - **FR-013**: `GET /search/memory-items` MUST return projection hits only and MUST remain non-authoritative.
 - **FR-014**: `/health` MUST be local-only liveness and `/ready` MUST reflect authoritative write-path readiness plus search degradation.
 - **FR-015**: Public contracts MUST NOT expose migration-only aliases, alternate identity paths, or compatibility-only fields.
+
+## Non-Functional Requirements
+
+- **NC-001**: Registration requests for representative canonical/manual and direct-standard payloads under 100 KB MUST meet a p95 latency target of 5 seconds or less in release validation.
+- **NC-002**: Authoritative retrieval requests for representative stored sources and memory items MUST meet a p95 latency target of 200 ms or less in release validation.
+- **NC-003**: Search projection queries against the representative benchmark corpus MUST meet a p95 latency target of 500 ms or less in release validation.
+- **NC-004**: Performance-sensitive changes in this slice MUST produce reproducible benchmark or load evidence for latency, throughput, and error rate before release.
+- **NC-005**: Concurrent duplicate registrations across stateless app instances MUST converge on one authoritative source outcome without data divergence.
+- **NC-006**: Authoritative writes MUST be transactional and leave no partial authoritative state behind after timeout, conflict, or storage failure.
+- **NC-007**: Search indexing and projection behavior MUST remain non-authoritative; search degradation or backlog MUST NOT block authoritative registration or retrieval.
+- **NC-009**: All public endpoints MUST emit structured logs, request correlation, traces, and latency metrics sufficient for operational diagnosis.
+- **NC-010**: `/health` and `/ready` MUST expose distinct liveness versus readiness semantics and response shapes.
+- **NC-011**: Logs, metrics, and error payloads MUST avoid raw authoritative content and arbitrary caller metadata that could leak sensitive information.
+- **NC-012**: Supported standard payloads MUST be validated at the HTTP boundary against pinned allow or reject rules before any authoritative persistence occurs.
+- **NC-016**: Authoritative source, memory-item, and indexing records in this slice MUST default to a no-TTL, no-automatic-purge retention baseline unless a later spec changes that policy.
 
 ## Data Model Summary
 

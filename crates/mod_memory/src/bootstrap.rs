@@ -1,10 +1,14 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
 
 use core_infra::surrealdb::{
     CommitRegistrationOutcome, InMemorySurrealDb, PersistedMemoryItemRecord, PersistedSourceRecord,
     SearchProjectionRecord,
 };
 use core_shared::{AppError, AppResult, DefaultIdGenerator, IdGenerator};
+use jsonschema::Validator;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use time::OffsetDateTime;
@@ -18,6 +22,16 @@ use crate::domain::{
         canonical_external_id_for_standard, derive_source_id, is_canonical_external_id,
     },
 };
+
+const OPEN_BADGES_ACHIEVEMENT_CREDENTIAL_SCHEMA: &str = include_str!(
+    "../../../specs/001-memory-ingest/contracts/1edtech/ob_v3p0_achievementcredential_schema.json"
+);
+const CLR_CREDENTIAL_SCHEMA: &str = include_str!(
+    "../../../specs/001-memory-ingest/contracts/1edtech/clr_v2p0_clrcredential_schema.json"
+);
+
+static OPEN_BADGES_VALIDATOR: OnceLock<Validator> = OnceLock::new();
+static CLR_VALIDATOR: OnceLock<Validator> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct MemoryModule {
@@ -232,9 +246,9 @@ fn parse_register_payload(raw_body: &str) -> AppResult<CanonicalSource> {
         });
     }
 
-    let title = required_string(&value, "name")?;
+    let family = validate_and_classify_standard_payload(&value)?;
+    let title = standard_title(&value, family)?;
     let original_standard_id = required_string(&value, "id")?;
-    let family = classify_standard_payload(&value)?;
     let source_domain = trusted_source_domain(&value, &original_standard_id)?;
     let external_id =
         canonical_external_id_for_standard(family, &source_domain, &original_standard_id);
@@ -256,39 +270,107 @@ fn parse_register_payload(raw_body: &str) -> AppResult<CanonicalSource> {
     })
 }
 
-fn classify_standard_payload(value: &Value) -> AppResult<StandardFamily> {
-    let context = value
-        .get("@context")
-        .ok_or_else(|| AppError::validation("supported-standard payload must include @context"))?;
-    let kind = value
-        .get("type")
-        .ok_or_else(|| AppError::validation("supported-standard payload must include type"))?;
+fn validate_and_classify_standard_payload(value: &Value) -> AppResult<StandardFamily> {
+    let open_badges_errors = schema_errors(open_badges_validator(), value);
+    let clr_errors = schema_errors(clr_validator(), value);
 
-    let context_text = context.to_string().to_lowercase();
-    let kind_text = kind.to_string().to_lowercase();
-    if context_text.contains("openbadges")
-        || kind_text.contains("achievementcredential")
-        || kind_text.contains("openbadge")
-    {
-        Ok(StandardFamily::OpenBadges)
-    } else if context_text.contains("clr")
-        || kind_text.contains("clr")
-        || kind_text.contains("clrcredential")
-    {
-        Ok(StandardFamily::Clr)
-    } else if context_text.contains("openbadges")
-        || kind_text.contains("openbadge")
-        || kind_text.contains("achievementcredential")
-    {
-        Ok(StandardFamily::OpenBadges)
-    } else if value.get("issuer").is_some() {
-        Ok(StandardFamily::Clr)
-    } else {
-        Err(
-            AppError::validation("supported-standard payload is shape-valid but unmappable")
-                .with_error_code("INVALID_STANDARD_PAYLOAD"),
+    match (open_badges_errors.is_empty(), clr_errors.is_empty()) {
+        (true, false) => Ok(StandardFamily::OpenBadges),
+        (false, true) => Ok(StandardFamily::Clr),
+        (true, true) => {
+            if value_contains_token(value.get("type"), "ClrCredential") {
+                Ok(StandardFamily::Clr)
+            } else if value_contains_token(value.get("type"), "AchievementCredential")
+                || value_contains_token(value.get("type"), "OpenBadgeCredential")
+            {
+                Ok(StandardFamily::OpenBadges)
+            } else {
+                Err(AppError::validation(
+                    "supported-standard payload is shape-valid but unmappable",
+                )
+                .with_error_code("INVALID_STANDARD_PAYLOAD"))
+            }
+        }
+        (false, false) => Err(AppError::validation(
+            "supported-standard payload failed pinned 1EdTech envelope validation",
         )
+        .with_details(json!({
+            "open_badges": open_badges_errors,
+            "clr": clr_errors,
+        }))),
     }
+}
+
+fn standard_title(value: &Value, family: StandardFamily) -> AppResult<String> {
+    if let Some(name) = localized_string(value.get("name")) {
+        return Ok(name);
+    }
+
+    if family == StandardFamily::OpenBadges {
+        if let Some(name) = localized_string(value.pointer("/credentialSubject/achievement/name")) {
+            return Ok(name);
+        }
+    }
+
+    Err(AppError::validation(
+        "supported-standard payload is shape-valid but unmappable",
+    )
+    .with_error_code("INVALID_STANDARD_PAYLOAD"))
+}
+
+fn localized_string(value: Option<&Value>) -> Option<String> {
+    match value? {
+        Value::String(text) => {
+            let trimmed = text.trim();
+            (!trimmed.is_empty()).then(|| trimmed.to_owned())
+        }
+        Value::Object(map) => {
+            let mut entries = map
+                .iter()
+                .filter_map(|(locale, value)| value.as_str().map(|text| (locale, text.trim())))
+                .filter(|(_, text)| !text.is_empty())
+                .collect::<Vec<_>>();
+            entries.sort_by(|left, right| left.0.cmp(right.0));
+            entries.first().map(|(_, text)| (*text).to_owned())
+        }
+        _ => None,
+    }
+}
+
+fn value_contains_token(value: Option<&Value>, expected: &str) -> bool {
+    match value {
+        Some(Value::String(token)) => token == expected,
+        Some(Value::Array(values)) => values.iter().any(|value| value.as_str() == Some(expected)),
+        _ => false,
+    }
+}
+
+fn schema_errors(validator: &Validator, value: &Value) -> Vec<String> {
+    validator
+        .iter_errors(value)
+        .take(5)
+        .map(|error| error.to_string())
+        .collect()
+}
+
+fn open_badges_validator() -> &'static Validator {
+    OPEN_BADGES_VALIDATOR.get_or_init(|| {
+        compile_validator(
+            OPEN_BADGES_ACHIEVEMENT_CREDENTIAL_SCHEMA,
+            "Open Badges 3.0 AchievementCredential",
+        )
+    })
+}
+
+fn clr_validator() -> &'static Validator {
+    CLR_VALIDATOR.get_or_init(|| compile_validator(CLR_CREDENTIAL_SCHEMA, "CLR 2.0 ClrCredential"))
+}
+
+fn compile_validator(schema_text: &str, schema_name: &str) -> Validator {
+    let schema: Value = serde_json::from_str(schema_text)
+        .unwrap_or_else(|error| panic!("failed to parse pinned {schema_name} schema: {error}"));
+    jsonschema::validator_for(&schema)
+        .unwrap_or_else(|error| panic!("failed to compile pinned {schema_name} schema: {error}"))
 }
 
 fn trusted_source_domain(value: &Value, original_standard_id: &str) -> AppResult<String> {

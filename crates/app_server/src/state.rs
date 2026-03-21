@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use core_infra::InMemorySurrealDb;
+use core_infra::{
+    InMemorySurrealDb, InfrastructureSetup, MeilisearchClient, surrealdb::SurrealDbClient,
+};
 use core_shared::StartupError;
 use mod_memory::MemoryModule;
 use serde::{Deserialize, Serialize};
@@ -32,16 +34,25 @@ pub struct ProbeSnapshot {
 
 impl AppState {
     pub async fn bootstrap(config: AppConfig) -> Result<Self, StartupError> {
-        let db = Arc::new(InMemorySurrealDb::new());
-        let search_enabled = !config.meilisearch.http_addr.trim().is_empty()
-            && !config.meilisearch.master_key.trim().is_empty();
-        db.set_search_available(search_enabled);
+        let setup = InfrastructureSetup::bootstrap_in_memory(
+            SurrealDbClient::new(
+                config.surrealdb.url.clone(),
+                config.surrealdb.namespace.clone(),
+                config.surrealdb.database.clone(),
+                config.surrealdb.username.clone(),
+            ),
+            MeilisearchClient::new(
+                config.meilisearch.http_addr.clone(),
+                config.meilisearch.master_key.clone(),
+            ),
+        );
+        let search_enabled = setup.meilisearch.readiness_probe().is_ok();
         let memory_module =
-            MemoryModule::fixture(db.clone(), config.timeouts.normalization_timeout);
+            MemoryModule::fixture(setup.db.clone(), config.timeouts.normalization_timeout);
         Ok(Self {
             config,
             memory_module,
-            db,
+            db: setup.db,
             search_enabled,
         })
     }

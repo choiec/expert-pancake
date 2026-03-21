@@ -1,5 +1,5 @@
 use axum::{
-    Router,
+    Router, middleware,
     routing::{get, post},
 };
 
@@ -25,5 +25,6 @@ pub fn build_router(state: AppState) -> Router {
             "/search/memory-items",
             get(handlers::search_memory_items::search_memory_items),
         )
+        .layer(middleware::from_fn(crate::middleware::request_context))
         .with_state(state)
 }

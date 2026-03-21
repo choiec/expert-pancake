@@ -32,8 +32,8 @@ fn text_normalization_uses_utf8_byte_offsets() {
 
 #[test]
 fn formatting_only_json_replays_share_hash() {
-    let compact = r#"{"id":"1","name":"A","type":"AchievementCredential","@context":"https://purl.imsglobal.org/spec/ob/v3p0/context.json"}"#;
-    let pretty = "{\n  \"name\": \"A\",\n  \"type\": \"AchievementCredential\",\n  \"@context\": \"https://purl.imsglobal.org/spec/ob/v3p0/context.json\",\n  \"id\": \"1\"\n}";
+    let compact = r#"{"@context":["https://www.w3.org/ns/credentials/v2","https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"],"id":"https://example.com/credential/1","type":["VerifiableCredential","AchievementCredential"],"name":"A","issuer":"https://issuer.example.com/issuers/1","validFrom":"2025-01-01T00:00:00Z","credentialSubject":{"type":"AchievementSubject","achievement":{"id":"https://example.com/achievements/a","type":"Achievement","name":"A","description":"A desc","criteria":{}}}}"#;
+    let pretty = "{\n  \"credentialSubject\": {\n    \"achievement\": {\n      \"criteria\": {},\n      \"description\": \"A desc\",\n      \"id\": \"https://example.com/achievements/a\",\n      \"name\": \"A\",\n      \"type\": \"Achievement\"\n    },\n    \"type\": \"AchievementSubject\"\n  },\n  \"validFrom\": \"2025-01-01T00:00:00Z\",\n  \"issuer\": \"https://issuer.example.com/issuers/1\",\n  \"name\": \"A\",\n  \"type\": [\n    \"VerifiableCredential\",\n    \"AchievementCredential\"\n  ],\n  \"id\": \"https://example.com/credential/1\",\n  \"@context\": [\n    \"https://www.w3.org/ns/credentials/v2\",\n    \"https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json\"\n  ]\n}";
     assert_eq!(
         normalized_json_hash(compact).unwrap(),
         normalized_json_hash(pretty).unwrap()

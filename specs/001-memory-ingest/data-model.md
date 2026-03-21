@@ -111,3 +111,22 @@ Non-authoritative Meilisearch projection rebuilt from authoritative state.
 - Search remains non-authoritative.
 - Search lag or degradation must not change authoritative replay or retrieval behavior.
 - Projection rows may include canonical identity fields for diagnostics, but they do not govern authoritative outcomes.
+
+## MemoryIndexJob
+
+Represents the durable authoritative outbox record that bridges committed source state to non-authoritative search projection work.
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `job_id` | UUID | yes | stable outbox identifier |
+| `source_id` | UUID | yes | authoritative source reference |
+| `status` | enum | yes | internal values such as `pending`, `processing`, `retryable`, `completed`, `dead_letter` |
+| `retry_count` | integer | yes | bounded retry tracking |
+| `created_at` | timestamp | yes | first durable acceptance time |
+| `updated_at` | timestamp | yes | latest worker status update |
+
+### Memory-index-job invariants
+
+- A `MemoryIndexJob` is committed in the same authoritative transaction as `Source` and `MemoryItem` rows.
+- Public API responses never expose raw internal outbox statuses directly; they summarize indexing state as `queued`, `indexed`, or `deferred`.
+- Projection workers rehydrate projection payloads from authoritative `Source` and `MemoryItem` rows rather than treating the outbox as an alternate source of truth.

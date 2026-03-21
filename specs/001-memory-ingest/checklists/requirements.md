@@ -72,11 +72,11 @@
 ## Feature Readiness
 
 - [x] All functional requirements have clear acceptance criteria
-  - ✓ FR-001 (register endpoint) → AC-F1 validates HTTP 201 and URN retrieval
-  - ✓ FR-002 (input validation) → AC-F6 validates edge case handling
-  - ✓ FR-003 (normalization) → AC-F1, AC-F6 validate output consistency
-  - ✓ FR-004 (persistence) → AC-F1, AC-F2, AC-F3 validate data durability and deduplication
-  - ✓ FR-005/006 (retrieval) → AC-F3, AC-F4 validate correctness
+  - ✓ FR-001/FR-002 (registration boundary) → AC-001 and AC-002 validate accepted request classes and canonical identity rules
+  - ✓ FR-003/FR-004 (canonical identity derivation) → AC-002 and AC-003 validate canonical `external_id` plus deterministic `source_id`
+  - ✓ FR-005/FR-006/FR-007 (replay and conflict) → AC-003 and AC-004 validate deduplication and conflict semantics
+  - ✓ FR-008/FR-012 (preserved direct-standard retrieval) → AC-006 validates first-commit raw-body fidelity
+  - ✓ FR-011/FR-013/FR-014 (retrieval, search, probes) → AC-005 and AC-007 validate retrieval consistency and degraded-search isolation
   - ✓ All FRs map to at least one acceptance criterion
   
 - [x] User scenarios cover primary flows

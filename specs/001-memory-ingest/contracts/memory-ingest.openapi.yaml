@@ -236,11 +236,16 @@ components:
           additionalProperties: true
     OpenBadgesRegisterRequest:
       type: object
+      description: >-
+        Supported direct-standard Open Badges payloads must satisfy the pinned
+        1EdTech Open Badges 3.0 AchievementCredential JSON-LD envelope.
       required:
         - '@context'
         - type
         - id
-        - name
+        - credentialSubject
+        - issuer
+        - validFrom
       properties:
         '@context':
           oneOf:
@@ -259,14 +264,34 @@ components:
           description: Original standard payload identifier preserved as provenance only.
         name:
           type: string
+          description: >-
+            Optional wallet-facing credential name. When omitted, canonical
+            title derivation falls back to `credentialSubject.achievement.name`.
+        credentialSubject:
+          type: object
+          additionalProperties: true
+        issuer:
+          oneOf:
+            - type: string
+            - type: object
+              additionalProperties: true
+        validFrom:
+          type: string
+          format: date-time
       additionalProperties: true
     ClrRegisterRequest:
       type: object
+      description: >-
+        Supported direct-standard CLR payloads must satisfy the pinned 1EdTech
+        CLR 2.0 ClrCredential JSON-LD envelope.
       required:
         - '@context'
         - type
         - id
         - name
+        - credentialSubject
+        - issuer
+        - validFrom
       properties:
         '@context':
           oneOf:
@@ -285,9 +310,17 @@ components:
           description: Original standard payload identifier preserved as provenance only.
         name:
           type: string
-        issuer:
+        credentialSubject:
           type: object
           additionalProperties: true
+        issuer:
+          oneOf:
+            - type: string
+            - type: object
+              additionalProperties: true
+        validFrom:
+          type: string
+          format: date-time
       additionalProperties: true
     RegisterSourceResponse:
       type: object

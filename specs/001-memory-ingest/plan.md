@@ -2,8 +2,8 @@
 
 **Branch**: `001-memory-ingest` | **Date**: 2026-03-17 | **Spec**: `specs/001-memory-ingest/spec.md`
 **Status**: IMPLEMENT-READY
-**Input**: Feature specification from `/workspaces/rust/specs/001-memory-ingest/spec.md`
-**Related ADR**: `/workspaces/rust/specs/001-memory-ingest/adr/0001-direct-standard-ingest.md`
+**Input**: Feature specification from `/workspaces/debian/expert-pancake-ai/specs/001-memory-ingest/spec.md`
+**Related ADR**: `/workspaces/debian/expert-pancake-ai/specs/001-memory-ingest/adr/0001-direct-standard-ingest.md`
 
 ## Merge Note
 
@@ -19,7 +19,7 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
 **Language/Version**: Rust stable, edition 2024  
 **Primary Dependencies**: `axum`, `tokio`, `tower`, `tower-http`, `serde`, `serde_json`, `validator`, `uuid`, `sha2`, `tracing`, `tracing-subscriber`, `thiserror`, `surrealdb`, `meilisearch-sdk`  
 **Storage**: SurrealDB for authoritative source and memory-item persistence plus durable indexing outbox; Meilisearch for search projection only  
-**Testing**: `cargo test` with unit, integration, API contract, and storage adapter contract coverage  
+**Testing**: `cargo test` plus contract, integration, coverage, mutation, and benchmark gates as defined in `tasks.md`  
 **Target Platform**: Linux containerized web service behind an API gateway  
 **Project Type**: Multi-crate Rust web service  
 **Performance Goals**: registration under 5 seconds p95 for typical payloads, retrieval under 200 ms p95, search under 500 ms p95  
@@ -50,19 +50,19 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
 ### Remaining Implementation Risks
 
 1. **Standard-payload validation**
-  - Spec anchors: FR-001, FR-002, FR-014, AC-F7, AC-V1, NC-012
+  - Spec anchors: FR-001, FR-003, FR-014, AC-002, NC-012
   - Implementation activity: keep Open Badges and CLR validation at the HTTP boundary, execute pinned-schema checks before canonical mapping, and reject any payload that cannot produce one deterministic non-empty trimmed `id` and `name` pair.
   - Verification evidence: a validation matrix that proves accepted, schema-invalid, and shape-valid-but-unmappable payloads produce the documented allow or reject outcomes and never leave partial authoritative state.
 2. **Replay hashing**
-  - Spec anchors: FR-002, FR-005, AC-F2, AC-F3, AC-V2
+  - Spec anchors: FR-005, FR-006, FR-007, FR-008, AC-003, AC-004, AC-006
   - Implementation activity: compute a deterministic normalized JSON hash for supported standard payloads independently from the preserved raw-body content, compare that hash on replay, and preserve first-commit retrieval content unchanged.
   - Verification evidence: deterministic hash fixtures plus replay and conflict scenarios showing same-hash idempotency, preserved-content retrieval, and conflict detection for semantic changes.
 3. **Outbox mapping**
-  - Spec anchors: FR-006, FR-008, FR-009, AC-F1, AC-R2, AC-V3, NC-007
+  - Spec anchors: FR-008, FR-009, FR-013, AC-002, AC-005, AC-007, NC-007
   - Implementation activity: commit authoritative rows and `memory_index_job` in one transaction, rehydrate projection documents from authoritative storage, and map internal outbox states to public `indexing_status` without leaking internal vocabulary.
   - Verification evidence: contract and integration coverage proving that the outbox record contains the authoritative keys needed to reconstruct projection inputs and that external responses summarize indexing state only as `queued`, `indexed`, or `deferred`.
 4. **Performance gates**
-  - Spec anchors: AC-P1, AC-P2, AC-P3, AC-V4, NC-001, NC-002, NC-003, NC-004, NC-009
+  - Spec anchors: NC-001, NC-002, NC-003, NC-004, NC-009
   - Implementation activity: instrument endpoint latency and error-rate metrics, execute benchmark and load suites over representative canonical and direct-standard fixtures, and treat threshold assertions as release gates.
   - Verification evidence: reproducible benchmark or load reports showing p95 or p99 latency, throughput, and error-rate measurements against the published thresholds.
 
@@ -79,7 +79,7 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
 
 ### Handler
 
-- Location: `crates/app_server/src/` with route modules such as `handlers/memory_ingest.rs` and `handlers/health.rs`.
+- Location: `crates/app_server/src/` with route modules such as `handlers/source_register.rs`, `handlers/source_get.rs`, `handlers/memory_item_get.rs`, `handlers/search_memory_items.rs`, and `handlers/health.rs`.
 - Responsibilities:
   - Apply request body limit and content-type guards.
   - Deserialize request DTOs and run schema validation.
@@ -225,7 +225,7 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
 - Canonical register request fields remain `title`, `summary`, `external-id`, `document-type`, `content`, `metadata`.
 - Open Badges and CLR inputs are accepted as boundary-specific DTOs and validated against repository-pinned JSON Schema snapshots derived from the supported standard credential envelope profiles for this slice.
 - Validation strictness is strict for the supported envelope fields and canonical mapping prerequisites (`id`, `name`, and the required context/type markers), while remaining permissive for extension fields allowed by the pinned schemas.
-- A payload that matches a supported standard envelope but cannot be deterministically mapped into canonical `title`, `external_id`, and canonical content is rejected with `400 INVALID_STANDARD_PAYLOAD`. Unmappable means the payload cannot yield one non-empty trimmed `id` and `name` pair or cannot be deterministically classified to one supported family after the pinned-schema pass.
+- A payload that matches a supported standard envelope but cannot be deterministically mapped into canonical `title`, `external_id`, and canonical content is rejected with `400 INVALID_STANDARD_PAYLOAD`. Unmappable means the payload cannot yield one deterministic string `id`, cannot yield one deterministic canonical title (`name` or the supported Open Badges achievement-name fallback), or cannot be deterministically classified to one supported family after the pinned-schema pass.
 - Register response includes:
   - `source_id`
   - `external_id`
@@ -364,7 +364,7 @@ This vertical slice adds the first production-shaped ingest pipeline for canonic
   - benchmark registration latency with representative canonical markdown payloads under 100 KB and direct-standard JSON payloads under 100 KB
   - benchmark retrieval latency for single-item and 10k-item source scenarios
   - benchmark search latency against a representative 1M-document projection corpus or replayable synthetic fixture
-  - capture p95/p99 latency, throughput, and error rate from Prometheus-compatible metrics and fail the gate when AC-P1, AC-P2, AC-P3, AC-V4, NC-001, NC-002, NC-003, or NC-004 are exceeded
+  - capture p95/p99 latency, throughput, and error rate from Prometheus-compatible metrics and fail the gate when NC-001, NC-002, NC-003, or NC-004 are exceeded
 
 ## Rollout / Migration Notes
 
@@ -412,7 +412,10 @@ crates/
 │       ├── state.rs
 │       └── handlers/
 │           ├── health.rs
-│           └── memory_ingest.rs
+│           ├── memory_item_get.rs
+│           ├── search_memory_items.rs
+│           ├── source_get.rs
+│           └── source_register.rs
 ├── core_infra/
 │   └── src/
 │       ├── lib.rs

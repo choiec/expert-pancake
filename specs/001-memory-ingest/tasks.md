@@ -42,7 +42,7 @@
 
 **Purpose**: Normalize the Rust workspace and create the crate boundaries required by the plan.
 
-- [ ] T001 Align Rust workspace manifest and scaffold the memory ingest crate in Cargo.toml, crates/mod_memory/Cargo.toml, crates/mod_memory/src/lib.rs, crates/mod_memory/src/application/mod.rs, crates/mod_memory/src/domain/mod.rs, crates/mod_memory/src/infra/mod.rs
+- [x] T001 Align Rust workspace manifest and scaffold the memory ingest crate in Cargo.toml, crates/mod_memory/Cargo.toml, crates/mod_memory/src/lib.rs, crates/mod_memory/src/application/mod.rs, crates/mod_memory/src/domain/mod.rs, crates/mod_memory/src/infra/mod.rs
 
 Outcome: The repository becomes a proper Cargo workspace with a dedicated `mod_memory` crate matching the plan's application/domain/infra split.
 Dependencies: None.
@@ -66,7 +66,7 @@ Traceability: US1-US4 enablement; FR-008; FR-011; NC-007.
 
 **Critical**: No user-story endpoint work should begin until this phase is complete.
 
-- [ ] T003 Implement environment/config loading in crates/app_server/src/config.rs and crates/core_infra/src/setup.rs
+- [x] T003 Implement environment/config loading in crates/app_server/src/config.rs and crates/core_infra/src/setup.rs
 
 Outcome: Runtime configuration is loaded from environment variables into typed config structs for HTTP, SurrealDB, Meilisearch, limits, and timeouts.
 Dependencies: T002.
@@ -75,7 +75,7 @@ Constraints: Secrets must remain environment-injected; body size and timeout set
 Done-when: The app can construct validated config objects without hard-coded credentials, and missing required settings produce structured startup failures.
 Traceability: FR-002; FR-011; NC-001; constitution Secrets/config separation.
 
-- [ ] T004 [P] Create the common domain error model in crates/core_shared/src/error.rs and crates/core_shared/src/lib.rs
+- [x] T004 [P] Create the common domain error model in crates/core_shared/src/error.rs and crates/core_shared/src/lib.rs
 Outcome: Canonical error types exist for validation, conflict, timeout, not-found, storage, and search-degraded cases, ready for HTTP mapping and service composition.
 Dependencies: T001.
 Relevant inputs: spec.md FR-007, FR-012; plan.md Error Contract; repo memory fact about explicit error types.
@@ -91,7 +91,7 @@ Constraints: Handlers must stay thin; no business logic in `main.rs`; bootstrap 
 Done-when: `main.rs` builds the app from injected dependencies instead of printing a placeholder message.
 Traceability: US1-US4; G1; G6; constitution Layered handler/service/repository separation.
 
-- [ ] T006 Implement request-id, trace-context, and HTTP error mapping middleware in crates/app_server/src/middleware.rs
+- [x] T006 Implement request-id, trace-context, and HTTP error mapping middleware in crates/app_server/src/middleware.rs
 Outcome: Every request gets request correlation, W3C trace propagation, structured logging hooks, and canonical JSON error responses.
 Dependencies: T003, T004, T005.
 Relevant inputs: spec.md FR-010, FR-012, FR-013; plan.md Handler responsibilities and Error Contract.
@@ -99,29 +99,29 @@ Constraints: Do not log raw content payloads or arbitrary metadata; preserve pro
 Done-when: Route handlers can return service errors and receive consistent JSON error bodies with `error_code`, `message`, `details`, `timestamp`, and `request_id`.
 Traceability: US1-US4; FR-010; FR-012; FR-013; NC-011.
 
-- [ ] T007 [P] Implement SurrealDB and Meilisearch client bootstrap plus readiness probes in crates/core_infra/src/surrealdb.rs, crates/core_infra/src/meilisearch.rs, crates/core_infra/src/setup.rs
+- [x] T007 [P] Implement SurrealDB and Meilisearch client bootstrap plus readiness probes in crates/core_infra/src/surrealdb.rs, crates/core_infra/src/meilisearch.rs, crates/core_infra/src/setup.rs
 Outcome: Infrastructure adapters can connect with bounded timeouts, perform lightweight readiness checks, and expose reusable clients to the application.
 Dependencies: T002, T003.
 Relevant inputs: plan.md Repository and Indexing Adapter sections; research.md Decision 3, Decision 7, Decision 8.
 Constraints: SurrealDB readiness must represent write-path availability; Meilisearch availability must be reportable as degraded without blocking startup.
 Done-when: The app can create typed SurrealDB and Meilisearch clients and independently report database/search component status.
-Traceability: US1-US4; FR-008; FR-011; NC-007.
+Traceability: US1-US4; FR-008; FR-014; NC-007.
 
 - [x] T008 Implement health and readiness handlers with router wiring in crates/app_server/src/handlers/health.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
 Outcome: `/health` is available as a local-only liveness probe, and `/ready` is available as a dependency-aware readiness probe with explicit service/database/search status.
 Dependencies: T005, T006, T007.
-Relevant inputs: spec.md User Story 4 context, FR-011; plan.md REST Endpoints and Readiness semantics.
+Relevant inputs: spec.md User Story 4 context, FR-014; plan.md REST Endpoints and Readiness semantics.
 Constraints: `/health` must stay fast, return 200 without probing external dependencies, and expose service-local status only; `/ready` must fail when the SurrealDB write path is unavailable and may report degraded search while still returning 200.
 Done-when: The router exposes both endpoints with the JSON shape defined in the OpenAPI contract and plan.
-Traceability: G6; FR-011; AC-O2.
+Traceability: G6; FR-014; NC-010.
 
 - [ ] T034 [P] Add OpenAPI-backed contract validation for GET /health and GET /ready in tests/contract/health_readiness_contract.rs
 Outcome: The probe endpoints' distinct schemas and status-code matrices are pinned to the published contract before implementation proceeds.
 Dependencies: T008.
-Relevant inputs: contracts/memory-ingest.openapi.yaml `/health`, `/ready`; spec.md FR-011, NC-010.
+Relevant inputs: contracts/memory-ingest.openapi.yaml `/health`, `/ready`; spec.md FR-014, NC-010.
 Constraints: Assert `200` for `/health`, assert `200/503` for `/ready`, and verify `/health` uses the local-only schema while `/ready` uses the dependency-aware readiness schema.
 Done-when: Contract tests fail until probe semantics, payload shapes, and status codes match the published OpenAPI document exactly.
-Traceability: FR-011; NC-010; constitution API contract tests.
+Traceability: FR-014; NC-010; constitution API contract tests.
 
 **Checkpoint**: Foundation complete. Story work can now proceed with stable config, bootstrap, shared errors, and readiness probes.
 
@@ -143,21 +143,21 @@ Constraints: Cover canonical payload, Open Badges shape, CLR shape, `200`, `201`
 Done-when: Contract tests fail against the current placeholder app and define the exact registration surface, direct-standard response shapes, and status-code matrix that implementation must satisfy.
 Traceability: US1; FR-001; FR-002; constitution API contract tests.
 
-- [x] T010 [P] [US1] Add integration coverage for create, idempotent replay, and conflict paths in tests/integration/register_source_flow.rs
+- [x] T010 [P] [US1] Add integration coverage for create, idempotent replay, and conflict paths in crates/app_server/tests/memory_ingest_smoke.rs
 Outcome: End-to-end registration behavior is specified against real app wiring and authoritative persistence semantics.
 Dependencies: T008.
 Relevant inputs: spec.md User Story 1 acceptance scenarios; plan.md Idempotency and Transactions decisions.
 Constraints: Use isolated fixtures/test databases; verify no duplicate rows are visible after replay or conflict attempts for canonical requests and that the persisted registration response includes the expected public `indexing_status`.
 Done-when: Integration tests demonstrate failing expectations for `201 Created`, `200 OK` replay, and `409 Conflict` behavior for canonical requests before implementation.
-Traceability: US1; AC-F1; AC-F2; NC-006.
+Traceability: US1; AC-001; AC-003; AC-004; NC-006.
 
 - [ ] T042 [P] [US1] Add integration coverage for Open Badges and CLR success, replay, and conflict paths in tests/integration/register_source_standard_flow.rs and tests/fixtures/register_source/standards/*.json
 Outcome: End-to-end direct-standard ingest behavior is specified against real app wiring for the supported payload families.
 Dependencies: T008.
-Relevant inputs: spec.md FR-001, FR-002, FR-003, AC-F7; plan.md Standard-payload canonicalization and Idempotency decisions.
+Relevant inputs: spec.md FR-001, FR-002, FR-003, AC-002, AC-003, AC-004, AC-006; plan.md Standard-payload canonicalization and Idempotency decisions.
 Constraints: Cover Open Badges success, CLR success, formatting-only replay success, conflicting replay `409`, `document_type = json`, a single `json_document` memory item, exact preserved-content retrieval, and public `indexing_status` behavior.
 Done-when: Integration tests fail until supported standard payloads persist one authoritative `json_document` item, replay through normalized JSON hashing, and reject semantic conflicts without duplicate state.
-Traceability: US1; FR-001; FR-002; FR-003; AC-F2; AC-F3; AC-F7.
+Traceability: US1; FR-001; FR-002; FR-003; AC-002; AC-003; AC-004; AC-006.
 
 - [ ] T043 [P] [US1] Add boundary adapter tests for pinned-schema failure and shape-valid-but-unmappable payload handling in crates/app_server/src/handlers/source_register.rs and tests/contract/register_source_standard_errors.rs
 Outcome: The HTTP boundary's supported-standard validation and canonical mapping rules are pinned independently from storage behavior.
@@ -165,7 +165,7 @@ Dependencies: T008.
 Relevant inputs: spec.md FR-001, FR-002; plan.md Request / Response Shape and Failure Modes; contracts/memory-ingest.openapi.yaml `/sources/register`.
 Constraints: Cover pinned JSON Schema validation failure -> `400`, shape-valid but unmappable standard payload -> `400 INVALID_STANDARD_PAYLOAD`, and keep these checks at the HTTP adapter boundary without invoking persistence.
 Done-when: Unit/contract coverage fails until schema-invalid and unmappable standard payloads are distinguished correctly and returned as structured `400` responses.
-Traceability: US1; FR-001; FR-002; AC-F7; constitution API contract tests.
+Traceability: US1; FR-001; FR-003; NC-012; constitution API contract tests.
 
 - [ ] T035 [P] [US1] Add SurrealDB storage-adapter contract coverage in tests/contract/surreal_source_store_contract.rs, tests/contract/surreal_memory_store_contract.rs, and tests/contract/surreal_retention_contract.rs
 Outcome: The authoritative storage adapter's guarantees are pinned before implementation details diverge.
@@ -177,7 +177,7 @@ Traceability: US1; FR-002; FR-004; NC-006; NC-016; constitution Storage adapter 
 
 ### GREEN + REFACTOR: User Story 1
 
-- [x] T011 [P] [US1] Define the Source aggregate and canonical registration command in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/application/register_source.rs
+- [x] T011 [P] [US1] Define the Source aggregate and canonical registration command in crates/mod_memory/src/domain/source.rs and crates/mod_memory/src/bootstrap.rs
 Outcome: Canonical source types, idempotency-relevant fields, and registration command structures exist independently of HTTP DTOs.
 Dependencies: T004.
 Relevant inputs: data-model.md Source; spec.md FR-001, FR-014; plan.md Domain Model and Application / Service sections.
@@ -191,7 +191,7 @@ Dependencies: T004.
 Relevant inputs: data-model.md Memory Item; spec.md FR-003; research.md Decision 5 and Decision 6.
 Constraints: Preserve stable `sequence`, deterministic URN seeds, immutable content, placeholder behavior for empty content, and a single full-body `json_document` path for direct-standard ingest with UTF-8 byte offsets.
 Done-when: Domain normalization can derive ordered `MemoryItem` values from canonical source content with offsets, hashes, and unit types for `text`, `markdown`, `json_document`, and placeholder cases.
-Traceability: US1; FR-003; AC-F1; AC-F6.
+Traceability: US1; FR-008; AC-006.
 
 - [ ] T013 [US1] Define repository and indexing port traits in crates/mod_memory/src/infra/repo.rs and crates/mod_memory/src/infra/indexer.rs
 Outcome: Application services depend on explicit source, memory-item, query, and indexing ports instead of concrete storage clients.
@@ -209,13 +209,13 @@ Constraints: Use canonical identifiers only, keep the adapter no-op in this slic
 Done-when: The application can emit graph projection events to a no-op boundary that preserves the additive expansion contract for future graph work.
 Traceability: US1; FR-015; constitution Storage responsibility separation.
 
-- [x] T014 [US1] Implement the SurrealDB source repository and uniqueness bootstrap in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/infra/surreal_source_repo.rs
+- [x] T014 [US1] Implement the SurrealDB source repository and uniqueness bootstrap in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/bootstrap.rs
 Outcome: The system can create-or-return an authoritative source record keyed by `external_id` and canonical payload hash.
-Dependencies: T007, T011, T013.
+Dependencies: T007, T011.
 Relevant inputs: plan.md Source model, Repository section, Idempotency decision; data-model.md Source validation rules.
 Constraints: Enforce uniqueness in SurrealDB, not in handler memory; preserve immutable `source_id` and reserved system metadata.
 Done-when: A repository adapter can persist or replay `Source` rows transactionally and distinguish same-payload replay from conflicting payloads.
-Traceability: US1; FR-002; FR-004; AC-F2.
+Traceability: US1; FR-005; FR-006; FR-007.
 
 - [ ] T015 [US1] Implement the SurrealDB memory-item repository and indexing outbox persistence in crates/core_infra/src/surrealdb.rs and crates/mod_memory/src/infra/surreal_memory_repo.rs
 Outcome: Derived memory items and durable indexing jobs are written in the same authoritative transaction as the source.
@@ -225,13 +225,13 @@ Constraints: `(source_id, sequence)` and `urn` uniqueness must be enforced; no p
 Done-when: A transactional write can commit source, ordered memory items, and an outbox job atomically or roll back all of them.
 Traceability: US1; FR-003; FR-004; NC-006.
 
-- [x] T016 [US1] Implement RegisterSourceService in crates/mod_memory/src/application/register_source.rs
+- [x] T016 [US1] Implement RegisterSourceService in crates/mod_memory/src/bootstrap.rs
 Outcome: A use-case service validates canonical commands, normalizes content, enforces timeout/idempotency, persists authoritative state, and returns registration results with indexing status.
-Dependencies: T011, T012, T013, T014, T015.
+Dependencies: T011, T012, T014.
 Relevant inputs: plan.md RegisterSourceService; spec.md User Story 1 and edge cases; research.md Decision 4, Decision 6, Decision 7.
 Constraints: Meilisearch failures must not fail the write path; normalization must time out at 30 seconds; empty content must still yield a memory item; standard replay must compare normalized JSON hashes while preserving the first authoritative raw body unchanged.
 Done-when: The service can produce the success and failure states required by the registration contract, including `queued`/`indexed`/`deferred` indexing status and direct-standard replay/conflict handling, without direct HTTP or database client coupling.
-Traceability: US1; FR-002; FR-003; FR-004; AC-R1; AC-R2.
+Traceability: US1; FR-002; FR-003; FR-004; FR-005; FR-006; FR-007; FR-008; AC-001; AC-002; AC-003; AC-004.
 
 - [x] T017 [US1] Implement the source registration endpoint and request canonicalizers in crates/app_server/src/handlers/source_register.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
 Outcome: `POST /sources/register` accepts canonical, Open Badges, and CLR JSON bodies, maps them to the service command, and returns OpenAPI-compliant success/error responses.
@@ -266,28 +266,28 @@ Traceability: AC-001; AC-002; AC-003; AC-004; constitution Minimum merge gate.
 - [ ] T018 [P] [US2] Add OpenAPI-backed contract validation for GET /memory-items/{urn} in tests/contract/get_memory_item_contract.rs
 Outcome: The retrieval route's path parameter, success response, and not-found/storage error shapes are fixed against the published contract.
 Dependencies: T017.
-Relevant inputs: contracts/memory-ingest.openapi.yaml `/memory-items/{urn}`; spec.md FR-005, FR-007.
+Relevant inputs: contracts/memory-ingest.openapi.yaml `/memory-items/{urn}`; spec.md FR-012.
 Constraints: Assert authoritative response shape only; do not use search-projection data.
 Done-when: Contract tests fail until the endpoint returns the documented `MemoryItemResponse` and structured 404/503 errors.
-Traceability: US2; FR-005; FR-007; constitution API contract tests.
+Traceability: US2; FR-012; constitution API contract tests.
 
-- [x] T019 [P] [US2] Add integration coverage for successful and missing memory-item retrieval in tests/integration/get_memory_item_flow.rs
+- [x] T019 [P] [US2] Add integration coverage for successful and missing memory-item retrieval in crates/app_server/tests/memory_ingest_smoke.rs
 Outcome: End-to-end retrieval behavior is specified for an existing URN and a missing URN.
 Dependencies: T017.
 Relevant inputs: spec.md User Story 2 acceptance scenarios; quickstart.md Smoke Test: Retrieval.
 Constraints: Register test data through the public API or service path first; verify byte-accurate stored content for the positive case.
 Done-when: The integration suite contains failing assertions for `200 OK` content fidelity and `404` not-found behavior.
-Traceability: US2; AC-F3; AC-F6.
+Traceability: US2; AC-005; AC-006.
 
 ### GREEN + REFACTOR: User Story 2
 
 - [ ] T020 [US2] Implement the memory-item query repository and GetMemoryItemService in crates/mod_memory/src/infra/surreal_memory_query.rs and crates/mod_memory/src/application/get_memory_item.rs
 Outcome: The application can load a single authoritative memory item plus optional source context from SurrealDB.
 Dependencies: T013, T015.
-Relevant inputs: plan.md GetMemoryItemService and Retrieval View; data-model.md Memory Item; spec.md FR-005.
+Relevant inputs: plan.md GetMemoryItemService and Retrieval View; data-model.md Memory Item; spec.md FR-012.
 Constraints: Query path must use authoritative storage only; no Meilisearch fallback.
 Done-when: A service returns the canonical retrieval view or a not-found/shared storage error for a requested URN.
-Traceability: US2; FR-005; NC-002.
+Traceability: US2; FR-012; NC-002.
 
 - [ ] T021 [US2] Implement the memory-item retrieval endpoint in crates/app_server/src/handlers/memory_item_get.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
 Outcome: `GET /memory-items/{urn}` is exposed with correct path parsing, response DTO mapping, and structured errors.
@@ -295,7 +295,7 @@ Dependencies: T006, T020.
 Relevant inputs: contracts/memory-ingest.openapi.yaml `/memory-items/{urn}`; spec.md User Story 2.
 Constraints: Handler output must preserve authoritative content exactly as stored; error mapping must reuse the common JSON error model.
 Done-when: The route satisfies the contract and integration tests for existing and missing URNs.
-Traceability: US2; G4; FR-005; FR-007.
+Traceability: US2; G4; FR-012.
 
 ### VERIFY: User Story 2
 
@@ -322,10 +322,10 @@ Traceability: AC-005; AC-006; constitution Minimum merge gate.
 - [ ] T022 [P] [US3] Add OpenAPI-backed contract validation for GET /sources/{source-id} in tests/contract/get_source_contract.rs
 Outcome: The source retrieval endpoint's path parameter, response fields, and error semantics are pinned to the contract.
 Dependencies: T017.
-Relevant inputs: contracts/memory-ingest.openapi.yaml `/sources/{source-id}`; spec.md FR-006, FR-007.
+Relevant inputs: contracts/memory-ingest.openapi.yaml `/sources/{source-id}`; spec.md FR-009, FR-011.
 Constraints: Assert ascending `sequence` ordering in the response schema usage, not just field presence, and assert the public `indexing_status` vocabulary on source responses.
 Done-when: Contract tests fail until the endpoint returns the documented source-plus-items response, `indexing_status`, and structured 404/503 failures.
-Traceability: US3; FR-006; FR-007.
+Traceability: US3; FR-009; FR-011.
 
 - [ ] T023 [P] [US3] Add integration coverage for ordered source retrieval in tests/integration/get_source_flow.rs
 Outcome: End-to-end behavior is specified for retrieving source metadata and all associated memory items in stable order.
@@ -333,17 +333,17 @@ Dependencies: T017.
 Relevant inputs: spec.md User Story 3 acceptance scenarios; quickstart.md Smoke Test: Retrieval.
 Constraints: Verify ordering by `sequence` and association to the originating `source_id`.
 Done-when: Integration tests contain failing assertions for source metadata echoing and ordered memory-item lists.
-Traceability: US3; AC-F4; NC-004.
+Traceability: US3; AC-005; FR-011.
 
 ### GREEN + REFACTOR: User Story 3
 
 - [ ] T024 [US3] Implement the source query repository and GetSourceService in crates/mod_memory/src/infra/surreal_source_query.rs and crates/mod_memory/src/application/get_source.rs
 Outcome: The application can load a source aggregate view with all related memory items ordered from authoritative storage.
 Dependencies: T013, T015.
-Relevant inputs: plan.md GetSourceService and Retrieval View; data-model.md Source Retrieval View; spec.md FR-006.
+Relevant inputs: plan.md GetSourceService and Retrieval View; data-model.md Source Retrieval View; spec.md FR-009, FR-011.
 Constraints: Query must remain SurrealDB-authoritative and scale to large item counts without changing public ordering semantics.
 Done-when: The service returns source metadata plus ordered memory items or a shared not-found/storage error.
-Traceability: US3; FR-006; AC-F4.
+Traceability: US3; FR-009; FR-011; AC-005.
 
 - [ ] T025 [US3] Implement the source retrieval endpoint in crates/app_server/src/handlers/source_get.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
 Outcome: `GET /sources/{source-id}` exposes the authoritative source view through the HTTP API.
@@ -351,7 +351,7 @@ Dependencies: T006, T024.
 Relevant inputs: contracts/memory-ingest.openapi.yaml `/sources/{source-id}`; spec.md User Story 3.
 Constraints: The route must serialize memory items in ascending `sequence` and reuse the common error/trace middleware.
 Done-when: The endpoint satisfies both the contract and ordered retrieval integration tests.
-Traceability: US3; G4; FR-006; FR-007.
+Traceability: US3; G4; FR-009; FR-011.
 
 ### VERIFY: User Story 3
 
@@ -378,10 +378,10 @@ Traceability: AC-005; constitution Acceptance criteria to test mapping.
 - [ ] T026 [P] [US4] Add OpenAPI-backed contract validation for GET /search/memory-items in tests/contract/search_memory_items_contract.rs
 Outcome: Query parameters, result shape, and degraded-search error behavior are pinned to the contract.
 Dependencies: T008.
-Relevant inputs: contracts/memory-ingest.openapi.yaml `/search/memory-items`; spec.md FR-008, FR-009.
+Relevant inputs: contracts/memory-ingest.openapi.yaml `/search/memory-items`; spec.md FR-013, AC-007.
 Constraints: Contract coverage must include filters for `source-id`, `document-type`, `limit`, and `offset`, including `document-type = json`, and must assert that the `200` response returns projection hits rather than authoritative memory-item payloads.
 Done-when: Contract tests fail until the endpoint returns `SearchResponse` projection hits or structured `503` for unavailable search.
-Traceability: US4; FR-008; FR-009.
+Traceability: US4; FR-013; AC-007.
 
 - [ ] T027 [P] [US4] Add integration coverage for indexing success and degraded search in tests/integration/search_projection_flow.rs
 Outcome: The projection pipeline is specified for both healthy indexing and Meilisearch-unavailable scenarios.
@@ -389,25 +389,25 @@ Dependencies: T017.
 Relevant inputs: spec.md User Story 4 acceptance scenarios; edge case `Search projection failures`; research.md Decision 8.
 Constraints: Registration must still succeed when search is unavailable; the test should observe `queued` and `deferred` indexing states rather than require synchronous search writes, and should cover search filtering for `document_type = json`.
 Done-when: Integration tests contain failing assertions for searchable projection hits, direct-standard search projections, and degraded `503` search behavior.
-Traceability: US4; AC-F5; AC-R2; NC-007.
+Traceability: US4; AC-007; NC-007.
 
 - [ ] T037 [P] [US4] Add Meilisearch storage-adapter contract coverage in tests/contract/meilisearch_projection_contract.rs
 Outcome: The non-authoritative search adapter's projection guarantees are pinned to the published slice semantics.
 Dependencies: T007.
-Relevant inputs: constitution Storage adapter verification; plan.md Storage adapter contract tests; spec.md FR-008, FR-009.
+Relevant inputs: constitution Storage adapter verification; plan.md Storage adapter contract tests; spec.md FR-013, AC-007.
 Constraints: Assert index settings, projection schema, filter behavior, sort behavior, and degraded availability semantics without treating Meilisearch as authoritative storage.
 Done-when: Adapter contract tests fail until the Meilisearch implementation proves the projection guarantees required by the spec and constitution.
-Traceability: US4; FR-008; FR-009; constitution Storage adapter verification.
+Traceability: US4; FR-013; AC-007; constitution Storage adapter verification.
 
 ### GREEN + REFACTOR: User Story 4
 
 - [ ] T028 [US4] Implement the Meilisearch indexing adapter and index settings bootstrap in crates/core_infra/src/meilisearch.rs and crates/mod_memory/src/infra/meili_indexer.rs
 Outcome: Canonical memory items can be translated into `memory_items_v1` projection documents with idempotent index settings.
 Dependencies: T007, T013, T015.
-Relevant inputs: data-model.md Search Projection; plan.md Indexing Adapter; spec.md FR-008.
+Relevant inputs: data-model.md Search Projection; plan.md Indexing Adapter; spec.md FR-013.
 Constraints: The adapter must remain non-authoritative and prepare content preview, filters, and sortable timestamps exactly as planned.
 Done-when: A concrete adapter can upsert projection documents and configure index settings for search/filter/sort behavior.
-Traceability: US4; FR-008; research.md Decision 7.
+Traceability: US4; FR-013; NC-007; research.md Decision 7.
 
 - [ ] T029 [US4] Implement the outbox-driven indexing worker and startup hook in crates/mod_memory/src/application/index_memory_items.rs, crates/app_server/src/main.rs, crates/app_server/src/state.rs
 Outcome: Background processing can consume durable indexing jobs, invoke the Meilisearch adapter, and mark success or retryable/dead-letter states.
@@ -415,15 +415,15 @@ Dependencies: T005, T015, T028.
 Relevant inputs: data-model.md MemoryIndexJob lifecycle; plan.md Background indexing worker; research.md Decision 7.
 Constraints: Worker failures must never roll back authoritative writes; retries must be bounded and observable; retry exhaustion must promote jobs to `dead_letter`; backlog state must remain inspectable via authoritative outbox records.
 Done-when: App bootstrap starts a background worker that can process queued indexing jobs from the outbox lifecycle, promote exhausted retries to `dead_letter`, preserve authoritative backlog visibility, and map internal job states to external `queued`/`indexed`/`deferred` responses without leaking internal vocabulary.
-Traceability: US4; FR-008; NC-007; constitution Indexing vs query separation.
+Traceability: US4; FR-013; NC-007; constitution Indexing vs query separation.
 
 - [ ] T030 [US4] Implement SearchMemoryItemsService and the search endpoint in crates/mod_memory/src/application/search_memory_items.rs, crates/app_server/src/handlers/search_memory_items.rs, crates/app_server/src/handlers/mod.rs, crates/app_server/src/router.rs
 Outcome: `GET /search/memory-items` exposes Meilisearch-backed query, filtering, pagination, and degraded-search error mapping.
 Dependencies: T006, T028, T029.
-Relevant inputs: contracts/memory-ingest.openapi.yaml `/search/memory-items`; plan.md SearchMemoryItemsService; spec.md FR-009.
+Relevant inputs: contracts/memory-ingest.openapi.yaml `/search/memory-items`; plan.md SearchMemoryItemsService; spec.md FR-013, AC-007.
 Constraints: Search must not read from SurrealDB as a hidden fallback; degraded behavior must remain explicit.
 Done-when: The route returns search hits when Meilisearch is healthy and a structured `503` when it is not.
-Traceability: US4; G5; FR-009; AC-R2.
+Traceability: US4; G5; FR-013; AC-007.
 
 ### VERIFY: User Story 4
 
@@ -446,58 +446,58 @@ Traceability: AC-007; constitution Tooling baseline.
 - [ ] T038 Implement Prometheus-compatible latency metrics and histogram buckets in crates/app_server/src/middleware.rs, crates/app_server/src/state.rs, and crates/app_server/src/main.rs
 Outcome: Endpoint latency is emitted with the histogram buckets required by the spec, and tracing/metrics share the same request correlation model.
 Dependencies: T005, T006.
-Relevant inputs: spec.md FR-013, NC-009; plan.md Observability requirements.
+Relevant inputs: spec.md NC-009; plan.md Observability requirements.
 Constraints: Instrument all public endpoints, use the histogram buckets defined in the spec, and do not log or emit metric labels containing sensitive request content; labels must distinguish canonical versus direct-standard ingest only through bounded dimensions such as `document_type` and `ingest_kind`.
 Done-when: The runtime exposes the latency measurements needed to calculate p95/p99 for all public endpoints using the configured histogram buckets and can segment registration metrics by canonical versus direct-standard ingest.
-Traceability: FR-013; NC-009; constitution Observability.
+Traceability: NC-009; constitution Observability.
 
 - [ ] T039 [P] Add observability validation for trace propagation and latency metrics in tests/integration/observability_tracing_flow.rs and tests/integration/observability_metrics.rs
 Outcome: The required request tracing and latency observability guarantees are verified end-to-end.
 Dependencies: T017, T021, T025, T030, T038.
-Relevant inputs: spec.md FR-013, NC-009; plan.md Testing / Validation Strategy.
+Relevant inputs: spec.md NC-009; plan.md Testing / Validation Strategy.
 Constraints: Assert W3C trace-context propagation, span/trace coverage for registration and search indexing, and the presence of histogram-backed latency observations for all public endpoints, including direct-standard registration.
 Done-when: Integration tests fail until trace propagation and metrics behavior satisfy the published observability requirements for canonical and direct-standard ingest paths.
-Traceability: FR-013; NC-009; constitution API contract tests.
+Traceability: NC-009; constitution API contract tests.
 
 - [ ] T044 [P] Add benchmark and load-validation coverage for registration, retrieval, and search with `criterion` in benches/memory_ingest_latency.rs, tests/perf/memory_ingest_slo.rs, and tests/fixtures/perf/*.json
 Outcome: The feature has an executable performance validation plan tied to the published p95/p99 goals before implementation is declared complete.
 Dependencies: T017, T021, T025, T030, T038.
-Relevant inputs: spec.md AC-P1, AC-P2, AC-P3, NC-001, NC-002, NC-003, NC-004; plan.md Performance validation strategy; quickstart.md Suggested Local Validation Sequence.
+Relevant inputs: spec.md NC-001, NC-002, NC-003, NC-004; plan.md Performance validation strategy; quickstart.md Suggested Local Validation Sequence.
 Constraints: Measure p95/p99 latency, throughput, and error rate for representative payloads and data shapes: canonical markdown under 100 KB, direct-standard Open Badges/CLR JSON under 100 KB, retrieval of a 10k-item source, and search against a representative 1M-item projection corpus or replayable synthetic fixture. Use Prometheus-compatible metrics emitted by T038 as the primary capture path and define pass/fail thresholds for each published performance requirement.
-Done-when: The repository contains an automatable benchmark/load suite that fails the release gate when AC-P1, AC-P2, AC-P3, AC-V4, NC-001, NC-002, NC-003, or NC-004 are exceeded and emits a reproducible report of p95/p99 latency, throughput, and error rate.
-Traceability: AC-P1; AC-P2; AC-P3; AC-V4; NC-001; NC-002; NC-003; NC-004; NC-009.
+Done-when: The repository contains an automatable benchmark/load suite that fails the release gate when NC-001, NC-002, NC-003, or NC-004 are exceeded and emits a reproducible report of p95/p99 latency, throughput, and error rate.
+Traceability: NC-001; NC-002; NC-003; NC-004; NC-009.
 
 - [ ] T045 [P] Add explicit standard-payload validation correctness verification in tests/contract/register_source_standard_validation_matrix.rs and tests/fixtures/register_source/validation_matrix/*.json using `insta` for representative error and success bodies
 Outcome: The documented allow and reject rules for Open Badges and CLR direct ingest are pinned as executable verification coverage rather than left implicit across existing contract tests.
 Dependencies: T017.
-Relevant inputs: spec.md FR-001, FR-002, FR-014, AC-F7, AC-V1; plan.md Remaining Implementation Risks; contracts/memory-ingest.openapi.yaml `/sources/register`.
+Relevant inputs: spec.md FR-001, FR-003, FR-014, AC-002, NC-012; plan.md Remaining Implementation Risks; contracts/memory-ingest.openapi.yaml `/sources/register`.
 Constraints: Cover accepted payloads, pinned-schema failures, and shape-valid-but-unmappable payloads for both supported standard families; assert that only canonical-mappable payloads can create authoritative state and that rejected payloads produce the documented `400` semantics.
 Done-when: Verification coverage fails until the implementation proves standard-payload validation behavior matches the documented allow and reject matrix exactly.
-Traceability: FR-001; FR-002; FR-014; AC-F7; AC-V1; NC-012.
+Traceability: FR-001; FR-003; FR-014; AC-002; NC-012.
 
 - [ ] T046 [P] Add replay hashing determinism and idempotency verification in tests/unit/normalized_json_hash.rs, tests/integration/register_source_replay_hashing.rs, and tests/fixtures/register_source/replay_hashing/*.json using `proptest` for normalization invariants
 Outcome: Replay behavior for supported standard payloads is verified directly against the normalized-hash rule and preserved-content retrieval guarantee.
 Dependencies: T016, T017, T021.
-Relevant inputs: spec.md FR-002, FR-005, AC-F2, AC-F3, AC-V2; plan.md Remaining Implementation Risks; data-model.md Canonicalization Rules.
+Relevant inputs: spec.md FR-005, FR-006, FR-007, FR-008, AC-003, AC-004, AC-006; plan.md Remaining Implementation Risks; data-model.md Canonicalization Rules.
 Constraints: Prove that formatting-only variants of the same validated payload produce the same canonical payload hash and authoritative identifiers, that the first committed raw body remains the retrieval payload, and that semantic changes still yield `409 Conflict`.
 Done-when: Verification coverage fails until replay hashing is demonstrably deterministic for equivalent payload semantics and conflict-producing for semantic divergence.
-Traceability: FR-002; FR-005; AC-F2; AC-F3; AC-V2.
+Traceability: FR-005; FR-006; FR-007; FR-008; AC-003; AC-004; AC-006.
 
 - [ ] T047 [P] Add authoritative outbox-to-projection mapping verification in tests/contract/indexing_outbox_mapping_contract.rs and tests/integration/indexing_status_mapping_flow.rs
 Outcome: The durable indexing path is verified as a semantic mapping from authoritative rows to projection inputs, with public status translation checked independently from worker internals.
 Dependencies: T015, T029, T030.
-Relevant inputs: spec.md FR-006, FR-008, FR-009, AC-F1, AC-R2, AC-V3; plan.md Remaining Implementation Risks; data-model.md MemoryIndexJob and Public `indexing_status` Mapping.
+Relevant inputs: spec.md FR-008, FR-009, FR-013, AC-002, AC-005, AC-007; plan.md Remaining Implementation Risks; data-model.md MemoryIndexJob and Public `indexing_status` Mapping.
 Constraints: Assert that committed outbox records contain the authoritative keys needed to reconstruct projection documents, that projection inputs can be rehydrated without semantic loss from `Source` and `MemoryItem` rows, and that external responses expose only `queued`, `indexed`, or `deferred`.
 Done-when: Verification coverage fails until outbox persistence, projection rehydration, and public `indexing_status` mapping all match the documented contract.
-Traceability: FR-006; FR-008; FR-009; AC-F1; AC-R2; AC-V3; NC-007.
+Traceability: FR-008; FR-009; FR-013; AC-002; AC-005; AC-007; NC-007.
 
 - [ ] T040 [P] Add concurrency and multi-instance validation in tests/integration/register_source_concurrency.rs and tests/integration/multi_instance_consistency.rs
 Outcome: Horizontal-scale and duplicate-registration guarantees are verified explicitly rather than inferred from unit behavior.
 Dependencies: T017, T021, T025.
-Relevant inputs: spec.md AC-F6, AC-R3, NC-005; plan.md Concurrency tests.
+Relevant inputs: spec.md AC-003, AC-004, NC-005; plan.md Concurrency tests.
 Constraints: Cover duplicate registration races, conflicting concurrent payloads, and consistent retrieval behavior across multiple stateless app instances backed by the same SurrealDB database.
 Done-when: Integration tests fail until the slice proves stateless multi-instance consistency and concurrent idempotency behavior.
-Traceability: NC-005; AC-F6; AC-R3.
+Traceability: NC-005; AC-003; AC-004.
 
 - [ ] T041 Update operational runbook coverage for indexing backlog inspection, retry exhaustion handling, and manual re-index recovery in specs/001-memory-ingest/quickstart.md, specs/001-memory-ingest/contracts/README.md, and README.md
 Outcome: Operators have explicit guidance for identifying backlog growth, understanding dead-letter promotion, and rebuilding Meilisearch from authoritative data.
@@ -510,10 +510,10 @@ Traceability: NC-007; G6; constitution Documentation & Runbooks.
 - [ ] T031 Add full-slice integration coverage for health, ready, register, retrieve, and search flows in tests/integration/memory_ingest_vertical_slice.rs
 Outcome: A single end-to-end validation covers the complete vertical slice from service bootstrap through ingest, retrieval, and search behavior.
 Dependencies: T008, T017, T021, T025, T030.
-Relevant inputs: quickstart.md Suggested Local Validation Sequence; spec.md G7 and success criteria.
+Relevant inputs: quickstart.md Suggested Local Validation Sequence; spec.md G7, AC-001, AC-005, AC-007.
 Constraints: Keep the test isolated and deterministic; verify authoritative retrieval even when search is degraded.
 Done-when: One integration suite exercises the documented smoke path and catches cross-story regressions.
-Traceability: G7; AC-F1; AC-F3; AC-F4; AC-F5.
+Traceability: G7; AC-001; AC-005; AC-007.
 
 - [ ] T032 Validate the published API contract against the implemented routes in tests/contract/openapi_smoke.rs and specs/001-memory-ingest/contracts/README.md
 Outcome: The repository has an explicit contract-validation checkpoint that ties route behavior back to the OpenAPI document and documents how to run it.

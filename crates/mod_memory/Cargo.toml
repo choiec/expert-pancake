@@ -7,6 +7,7 @@ edition.workspace = true
 core_infra = { path = "../core_infra" }
 core_shared = { path = "../core_shared" }
 http.workspace = true
+jsonschema.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
