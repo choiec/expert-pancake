@@ -47,6 +47,44 @@ pub struct PersistedSourceRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedCredentialProofRecord {
+    pub proof_type: String,
+    pub proof_purpose: String,
+    pub verification_method: String,
+    pub created: Option<String>,
+    pub cryptosuite: Option<String>,
+    pub proof_value: Option<String>,
+    pub jws: Option<String>,
+    pub payload: Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PersistedStandardCredentialRecord {
+    pub source_id: Uuid,
+    pub family: String,
+    pub version: String,
+    pub credential_id: String,
+    pub credential_name: String,
+    pub issuer_id: String,
+    pub subject_id: Option<String>,
+    pub raw_body: String,
+    pub raw_body_hash: String,
+    pub envelope: Value,
+    pub normalized_envelope: Value,
+    pub credential_subject: Value,
+    pub achievement: Option<Value>,
+    pub credential_schema: Vec<Value>,
+    pub credential_status: Vec<Value>,
+    pub evidence: Vec<Value>,
+    pub refresh_service: Vec<Value>,
+    pub terms_of_use: Vec<Value>,
+    pub proofs: Vec<PersistedCredentialProofRecord>,
+    pub verification: Value,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersistedMemoryItemRecord {
     pub urn: String,
     pub source_id: Uuid,
@@ -92,6 +130,7 @@ pub enum CommitRegistrationOutcome {
 struct SurrealState {
     sources_by_external_id: HashMap<String, PersistedSourceRecord>,
     memory_by_urn: HashMap<String, PersistedMemoryItemRecord>,
+    credentials_by_source_id: HashMap<Uuid, PersistedStandardCredentialRecord>,
     urns_by_source_id: HashMap<Uuid, Vec<String>>,
     search_docs: Vec<SearchProjectionRecord>,
     write_available: bool,
@@ -103,6 +142,7 @@ impl Default for SurrealState {
         Self {
             sources_by_external_id: HashMap::new(),
             memory_by_urn: HashMap::new(),
+            credentials_by_source_id: HashMap::new(),
             urns_by_source_id: HashMap::new(),
             search_docs: Vec::new(),
             write_available: true,
@@ -143,6 +183,7 @@ impl InMemorySurrealDb {
         &self,
         source: PersistedSourceRecord,
         memory_items: Vec<PersistedMemoryItemRecord>,
+        credential: Option<PersistedStandardCredentialRecord>,
     ) -> AppResult<CommitRegistrationOutcome> {
         let mut state = self.state.lock().expect("state poisoned");
         if !state.write_available {
@@ -172,6 +213,9 @@ impl InMemorySurrealDb {
 
         let source_id = source.source_id;
         let external_id = source.external_id.clone();
+        if let Some(credential) = credential {
+            state.credentials_by_source_id.insert(source_id, credential);
+        }
         for item in &memory_items {
             state.memory_by_urn.insert(item.urn.clone(), item.clone());
             state
@@ -238,6 +282,18 @@ impl InMemorySurrealDb {
             source,
             Self::public_indexing_status(state.search_available),
         ))
+    }
+
+    pub fn get_standard_credential(
+        &self,
+        source_id: Uuid,
+    ) -> Option<PersistedStandardCredentialRecord> {
+        self.state
+            .lock()
+            .expect("state poisoned")
+            .credentials_by_source_id
+            .get(&source_id)
+            .cloned()
     }
 
     pub fn search(

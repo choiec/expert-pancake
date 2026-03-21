@@ -26,6 +26,7 @@ Represents the authoritative stored source after canonical/manual validation or 
 - `source_id` is derived from canonical identity and remains distinct from `external_id`.
 - `external_id` always uses the canonical URI grammar under the project-owned namespace.
 - `source_metadata.system` is server-managed and carries provenance such as `canonical_id_version`, `ingest_kind`, `semantic_payload_hash`, and `original_standard_id` when present.
+- For certification-oriented direct-standard ingest, `source_metadata.system.verification` may summarize envelope, schema, and proof checks that passed before persistence.
 - Accepted direct-standard rows persist as `document_type = json`.
 
 ## Canonical Source Identity
@@ -58,12 +59,50 @@ Reserved server-managed metadata stored under `source_metadata.system`.
 | `ingest_kind` | enum | yes | `canonical` or `direct_standard` |
 | `semantic_payload_hash` | string | yes | authoritative replay and conflict comparator |
 | `original_standard_id` | string | no | present only for direct-standard rows |
+| `verification` | JSON object | no | certification-oriented envelope, schema, and proof validation summary |
 | `raw_body_hash` | string | no | diagnostics-only, not public |
 
 ### Public surface rules
 
 - Public API responses expose `canonical_id_version`, `ingest_kind`, `semantic_payload_hash`, and `original_standard_id` when present.
+- Public API responses may include a `verification` object for direct-standard sources when certification-oriented validation was applied.
 - `raw_body_hash` remains internal and is intentionally excluded from public response contracts.
+
+## StandardCredentialEnvelope
+
+Authoritative direct-standard storage record that preserves the official 1EdTech JSON-LD credential envelope without collapsing it into protocol-neutral fields only.
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `source_id` | UUID | yes | authoritative source reference |
+| `family` | enum | yes | `openbadges` or `clr` |
+| `version` | string | yes | `v3p0` or `v2p0` |
+| `credential_id` | string | yes | original top-level credential `id` |
+| `credential_name` | string | yes | canonical mapped title |
+| `issuer_id` | string | yes | top-level issuer identifier |
+| `subject_id` | string | no | top-level `credentialSubject.id` when present |
+| `raw_body` | string | yes | preserved authoritative UTF-8 body |
+| `raw_body_hash` | string | yes | diagnostics hash for preserved body |
+| `envelope` | JSON object | yes | parsed top-level JSON-LD credential as accepted |
+| `normalized_envelope` | JSON object | yes | recursively key-sorted semantic form used for inspection/debugging |
+| `credential_subject` | JSON object | yes | copied `credentialSubject` subtree |
+| `achievement` | JSON object | no | copied Open Badges achievement subtree when present |
+| `credential_schema` | JSON array | yes | copied `credentialSchema` entries |
+| `credential_status` | JSON array | no | copied `credentialStatus` entries |
+| `evidence` | JSON array | no | copied `evidence` entries |
+| `refresh_service` | JSON array | no | copied `refreshService` entries |
+| `terms_of_use` | JSON array | no | copied `termsOfUse` entries |
+| `proofs` | JSON array | yes | extracted and preserved proof objects |
+| `verification` | JSON object | yes | certification-oriented validation summary |
+| `created_at` | timestamp | yes | commit time |
+| `updated_at` | timestamp | yes | same as `created_at` in this slice |
+
+### Standard-credential-envelope invariants
+
+- Only direct-standard sources create a `StandardCredentialEnvelope`.
+- The stored `envelope` preserves the accepted official JSON-LD credential shape as parsed from the authoritative request body.
+- `credential_schema` must include the pinned official 1EdTech schema id and `1EdTechJsonSchemaValidator2019` type for the stored family.
+- `proofs` must be present and preserve the accepted proof objects that satisfied the certification-oriented boundary checks.
 
 ## Memory Item
 

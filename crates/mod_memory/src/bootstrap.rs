@@ -4,7 +4,8 @@ use std::{
 };
 
 use core_infra::surrealdb::{
-    CommitRegistrationOutcome, InMemorySurrealDb, PersistedMemoryItemRecord, PersistedSourceRecord,
+    CommitRegistrationOutcome, InMemorySurrealDb, PersistedCredentialProofRecord,
+    PersistedMemoryItemRecord, PersistedSourceRecord, PersistedStandardCredentialRecord,
     SearchProjectionRecord,
 };
 use core_shared::{AppError, AppResult, DefaultIdGenerator, IdGenerator};
@@ -104,6 +105,12 @@ pub struct SearchHitView {
     pub items: Vec<SearchProjectionRecord>,
 }
 
+#[derive(Debug, Clone)]
+struct ParsedRegistration {
+    canonical: CanonicalSource,
+    standard_credential: Option<PersistedStandardCredentialRecord>,
+}
+
 impl MemoryModule {
     pub fn fixture(db: Arc<InMemorySurrealDb>, normalization_timeout: Duration) -> Self {
         Self {
@@ -115,7 +122,8 @@ impl MemoryModule {
 
     pub fn register_source(&self, raw_body: &str) -> AppResult<RegisterSourceOutcome> {
         let started_at = OffsetDateTime::now_utc();
-        let source = parse_register_payload(raw_body)?;
+        let parsed = parse_register_payload(raw_body, started_at)?;
+        let source = parsed.canonical;
         let source_id = derive_source_id(&source.external_id);
         let normalized = normalize_source(
             &NormalizationInput {
@@ -152,9 +160,11 @@ impl MemoryModule {
             .map(into_persisted_memory_item)
             .collect();
 
-        let committed = self
-            .db
-            .commit_registration(persisted_source, persisted_items)?;
+        let committed = self.db.commit_registration(
+            persisted_source,
+            persisted_items,
+            parsed.standard_credential,
+        )?;
         match committed {
             CommitRegistrationOutcome::Created(bundle) => Ok(RegisterSourceOutcome {
                 created: true,
@@ -200,7 +210,10 @@ impl MemoryModule {
     }
 }
 
-fn parse_register_payload(raw_body: &str) -> AppResult<CanonicalSource> {
+fn parse_register_payload(
+    raw_body: &str,
+    started_at: OffsetDateTime,
+) -> AppResult<ParsedRegistration> {
     let value: Value = serde_json::from_str(raw_body)
         .map_err(|_| AppError::validation("request body must be valid json"))?;
 
@@ -235,18 +248,28 @@ fn parse_register_payload(raw_body: &str) -> AppResult<CanonicalSource> {
             "content": &content,
             "metadata": &user_metadata,
         })));
-        return Ok(CanonicalSource {
-            title,
-            summary,
-            external_id,
-            document_type,
-            content,
-            metadata: attach_system_metadata(user_metadata, "canonical", &canonical_hash, None),
-            canonical_hash,
+        return Ok(ParsedRegistration {
+            canonical: CanonicalSource {
+                title,
+                summary,
+                external_id,
+                document_type,
+                content,
+                metadata: attach_system_metadata(
+                    user_metadata,
+                    "canonical",
+                    &canonical_hash,
+                    None,
+                    None,
+                ),
+                canonical_hash,
+            },
+            standard_credential: None,
         });
     }
 
     let family = validate_and_classify_standard_payload(&value)?;
+    let verification = validate_standard_credential_for_certification(&value, family)?;
     let title = standard_title(&value, family)?;
     let original_standard_id = required_string(&value, "id")?;
     let source_domain = trusted_source_domain(&value, &original_standard_id)?;
@@ -254,19 +277,36 @@ fn parse_register_payload(raw_body: &str) -> AppResult<CanonicalSource> {
         canonical_external_id_for_standard(family, &source_domain, &original_standard_id);
     let canonical_hash = normalized_json_hash(raw_body)?;
 
-    Ok(CanonicalSource {
-        title,
-        summary: None,
-        external_id,
-        document_type: DocumentType::Json,
-        content: raw_body.to_owned(),
-        metadata: attach_system_metadata(
-            json!({}),
-            "direct_standard",
+    Ok(ParsedRegistration {
+        canonical: CanonicalSource {
+            title: title.clone(),
+            summary: None,
+            external_id,
+            document_type: DocumentType::Json,
+            content: raw_body.to_owned(),
+            metadata: attach_system_metadata(
+                json!({}),
+                "direct_standard",
+                &canonical_hash,
+                Some(original_standard_id.clone()),
+                Some(verification.clone()),
+            ),
+            canonical_hash: canonical_hash.clone(),
+        },
+        standard_credential: Some(build_standard_credential_record(
+            derive_source_id(&canonical_external_id_for_standard(
+                family,
+                &source_domain,
+                &original_standard_id,
+            )),
+            family,
+            &value,
+            raw_body,
+            &title,
             &canonical_hash,
-            Some(original_standard_id),
-        ),
-        canonical_hash,
+            verification,
+            started_at,
+        )?),
     })
 }
 
@@ -301,6 +341,211 @@ fn validate_and_classify_standard_payload(value: &Value) -> AppResult<StandardFa
     }
 }
 
+fn validate_standard_credential_for_certification(
+    value: &Value,
+    family: StandardFamily,
+) -> AppResult<Value> {
+    let contexts = string_tokens(value.get("@context"));
+    let missing_contexts = required_contexts_for(family)
+        .into_iter()
+        .filter(|context| !contexts.iter().any(|candidate| candidate == context))
+        .collect::<Vec<_>>();
+    if !missing_contexts.is_empty() {
+        return Err(AppError::validation(
+            "supported-standard payload is missing required certification contexts",
+        )
+        .with_error_code("INVALID_STANDARD_PAYLOAD")
+        .with_details(json!({ "missing_contexts": missing_contexts })));
+    }
+
+    let types = string_tokens(value.get("type"));
+    let missing_types = required_types_for(family)
+        .into_iter()
+        .filter(|kind| !types.iter().any(|candidate| candidate == kind))
+        .collect::<Vec<_>>();
+    if !missing_types.is_empty() {
+        return Err(AppError::validation(
+            "supported-standard payload is missing required certification types",
+        )
+        .with_error_code("INVALID_STANDARD_PAYLOAD")
+        .with_details(json!({ "missing_types": missing_types })));
+    }
+
+    let issuer_id = issuer_id(value)?;
+    if extract_host(&issuer_id).is_none() {
+        return Err(AppError::validation(
+            "supported-standard payload issuer id must be a URI with a host",
+        )
+        .with_error_code("INVALID_STANDARD_PAYLOAD"));
+    }
+
+    let credential_schema = json_array(value.get("credentialSchema"));
+    if credential_schema.is_empty() {
+        return Err(AppError::validation(
+            "supported-standard payload must include credentialSchema for certification-level ingest",
+        )
+        .with_error_code("INVALID_STANDARD_PAYLOAD"));
+    }
+
+    let expected_schema_id = match family {
+        StandardFamily::OpenBadges => {
+            "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json"
+        }
+        StandardFamily::Clr => {
+            "https://purl.imsglobal.org/spec/clr/v2p0/schema/json/clr_v2p0_clrcredential_schema.json"
+        }
+    };
+    let credential_schema_ok = credential_schema.iter().any(|entry| {
+        entry.get("id").and_then(Value::as_str) == Some(expected_schema_id)
+            && entry.get("type").and_then(Value::as_str) == Some("1EdTechJsonSchemaValidator2019")
+    });
+    if !credential_schema_ok {
+        return Err(AppError::validation(
+            "supported-standard payload credentialSchema must pin the official 1EdTech validator",
+        )
+        .with_error_code("INVALID_STANDARD_PAYLOAD")
+        .with_details(json!({
+            "expected_schema_id": expected_schema_id,
+            "expected_schema_type": "1EdTechJsonSchemaValidator2019",
+        })));
+    }
+
+    let proofs = proof_entries(value)?;
+    let supported_proof_types = [
+        "DataIntegrityProof",
+        "Ed25519Signature2018",
+        "Ed25519Signature2020",
+        "JsonWebSignature2020",
+    ];
+    let mut proof_summaries = Vec::with_capacity(proofs.len());
+    for proof in &proofs {
+        let proof_type = required_object_string(proof, "type")?;
+        if !supported_proof_types.contains(&proof_type.as_str()) {
+            return Err(AppError::validation(
+                "supported-standard payload proof type is not supported",
+            )
+            .with_error_code("INVALID_STANDARD_PAYLOAD")
+            .with_details(json!({
+                "supported_proof_types": supported_proof_types,
+                "actual": proof_type,
+            })));
+        }
+
+        let proof_purpose = required_object_string(proof, "proofPurpose")?;
+        if proof_purpose != "assertionMethod" {
+            return Err(AppError::validation(
+                "supported-standard payload proofPurpose must be assertionMethod",
+            )
+            .with_error_code("INVALID_STANDARD_PAYLOAD"));
+        }
+
+        let verification_method = required_object_string(proof, "verificationMethod")?;
+        if verification_method.trim().is_empty() {
+            return Err(AppError::validation(
+                "supported-standard payload proof verificationMethod must be non-empty",
+            )
+            .with_error_code("INVALID_STANDARD_PAYLOAD"));
+        }
+
+        let created = required_object_string(proof, "created")?;
+        let has_jws = proof
+            .get("jws")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .is_some_and(|value| value.split('.').count() == 3);
+        let has_proof_value = proof
+            .get("proofValue")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .is_some_and(|value| !value.is_empty());
+        if !has_jws && !has_proof_value {
+            return Err(AppError::validation(
+                "supported-standard payload proof must include a compact jws or proofValue",
+            )
+            .with_error_code("INVALID_STANDARD_PAYLOAD"));
+        }
+
+        proof_summaries.push(json!({
+            "type": proof_type,
+            "proof_purpose": proof_purpose,
+            "verification_method": verification_method,
+            "created": created,
+            "cryptographic_verification": "not_performed",
+        }));
+    }
+
+    Ok(json!({
+        "certification_envelope": "passed",
+        "credential_schema": "passed",
+        "proofs": proof_summaries,
+        "cryptographic_verification": "not_performed",
+    }))
+}
+
+fn build_standard_credential_record(
+    source_id: Uuid,
+    family: StandardFamily,
+    value: &Value,
+    raw_body: &str,
+    title: &str,
+    _canonical_hash: &str,
+    verification: Value,
+    created_at: OffsetDateTime,
+) -> AppResult<PersistedStandardCredentialRecord> {
+    let credential_id = required_string(value, "id")?;
+    let issuer_id = issuer_id(value)?;
+    let subject_id = value
+        .get("credentialSubject")
+        .and_then(|subject| subject.get("id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    let proofs = proof_entries(value)?
+        .into_iter()
+        .map(|proof| {
+            Ok(PersistedCredentialProofRecord {
+                proof_type: required_object_string(&proof, "type")?,
+                proof_purpose: required_object_string(&proof, "proofPurpose")?,
+                verification_method: required_object_string(&proof, "verificationMethod")?,
+                created: optional_object_string(&proof, "created"),
+                cryptosuite: optional_object_string(&proof, "cryptosuite"),
+                proof_value: optional_object_string(&proof, "proofValue"),
+                jws: optional_object_string(&proof, "jws"),
+                payload: proof,
+            })
+        })
+        .collect::<AppResult<Vec<_>>>()?;
+
+    Ok(PersistedStandardCredentialRecord {
+        source_id,
+        family: family.as_str().to_owned(),
+        version: family.default_version().to_owned(),
+        credential_id,
+        credential_name: title.to_owned(),
+        issuer_id,
+        subject_id,
+        raw_body: raw_body.to_owned(),
+        raw_body_hash: sha256_hex(raw_body),
+        envelope: value.clone(),
+        normalized_envelope: canonicalize_json_value(value),
+        credential_subject: value
+            .get("credentialSubject")
+            .cloned()
+            .unwrap_or_else(|| json!({})),
+        achievement: value.pointer("/credentialSubject/achievement").cloned(),
+        credential_schema: json_array(value.get("credentialSchema")),
+        credential_status: json_array(value.get("credentialStatus")),
+        evidence: json_array(value.get("evidence")),
+        refresh_service: json_array(value.get("refreshService")),
+        terms_of_use: json_array(value.get("termsOfUse")),
+        proofs,
+        verification,
+        created_at,
+        updated_at: created_at,
+    })
+}
+
 fn standard_title(value: &Value, family: StandardFamily) -> AppResult<String> {
     if let Some(name) = localized_string(value.get("name")) {
         return Ok(name);
@@ -312,10 +557,32 @@ fn standard_title(value: &Value, family: StandardFamily) -> AppResult<String> {
         }
     }
 
-    Err(AppError::validation(
-        "supported-standard payload is shape-valid but unmappable",
+    Err(
+        AppError::validation("supported-standard payload is shape-valid but unmappable")
+            .with_error_code("INVALID_STANDARD_PAYLOAD"),
     )
-    .with_error_code("INVALID_STANDARD_PAYLOAD"))
+}
+
+fn required_contexts_for(family: StandardFamily) -> Vec<&'static str> {
+    let mut contexts = vec!["https://www.w3.org/ns/credentials/v2"];
+    match family {
+        StandardFamily::OpenBadges => {
+            contexts.push("https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json");
+        }
+        StandardFamily::Clr => {
+            contexts.push("https://purl.imsglobal.org/spec/clr/v2p0/context-2.0.1.json");
+        }
+    }
+    contexts
+}
+
+fn required_types_for(family: StandardFamily) -> Vec<&'static str> {
+    let mut types = vec!["VerifiableCredential"];
+    match family {
+        StandardFamily::OpenBadges => types.push("AchievementCredential"),
+        StandardFamily::Clr => types.push("ClrCredential"),
+    }
+    types
 }
 
 fn localized_string(value: Option<&Value>) -> Option<String> {
@@ -343,6 +610,83 @@ fn value_contains_token(value: Option<&Value>, expected: &str) -> bool {
         Some(Value::Array(values)) => values.iter().any(|value| value.as_str() == Some(expected)),
         _ => false,
     }
+}
+
+fn string_tokens(value: Option<&Value>) -> Vec<String> {
+    match value {
+        Some(Value::String(token)) => vec![token.trim().to_owned()],
+        Some(Value::Array(values)) => values
+            .iter()
+            .filter_map(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn json_array(value: Option<&Value>) -> Vec<Value> {
+    match value {
+        Some(Value::Array(values)) => values.clone(),
+        Some(other) => vec![other.clone()],
+        None => Vec::new(),
+    }
+}
+
+fn proof_entries(value: &Value) -> AppResult<Vec<Value>> {
+    let proofs = json_array(value.get("proof"));
+    if proofs.is_empty() {
+        return Err(AppError::validation(
+            "supported-standard payload must include proof for certification-level ingest",
+        )
+        .with_error_code("INVALID_STANDARD_PAYLOAD"));
+    }
+    if proofs.iter().any(|proof| !proof.is_object()) {
+        return Err(AppError::validation(
+            "supported-standard payload proof must be an object or array of objects",
+        )
+        .with_error_code("INVALID_STANDARD_PAYLOAD"));
+    }
+    Ok(proofs)
+}
+
+fn issuer_id(value: &Value) -> AppResult<String> {
+    value
+        .get("issuer")
+        .and_then(|issuer| issuer.get("id").or(Some(issuer)))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            AppError::validation("supported-standard payload issuer must contain a string id")
+                .with_error_code("INVALID_STANDARD_PAYLOAD")
+        })
+}
+
+fn required_object_string(value: &Value, key: &str) -> AppResult<String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            AppError::validation(format!(
+                "supported-standard payload object field '{key}' is required"
+            ))
+            .with_error_code("INVALID_STANDARD_PAYLOAD")
+        })
+}
+
+fn optional_object_string(value: &Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
 }
 
 fn schema_errors(validator: &Validator, value: &Value) -> Vec<String> {
@@ -421,6 +765,7 @@ fn attach_system_metadata(
     ingest_kind: &str,
     semantic_payload_hash: &str,
     original_standard_id: Option<String>,
+    verification: Option<Value>,
 ) -> Value {
     let mut metadata = match metadata {
         Value::Object(map) => map,
@@ -434,6 +779,7 @@ fn attach_system_metadata(
             "ingest_kind": ingest_kind,
             "semantic_payload_hash": semantic_payload_hash,
             "original_standard_id": original_standard_id,
+            "verification": verification,
         }),
     );
 
@@ -471,6 +817,22 @@ fn canonical_json_shape(value: &Value) -> String {
                 .join(",");
             format!("{{{inner}}}")
         }
+    }
+}
+
+fn canonicalize_json_value(value: &Value) -> Value {
+    match value {
+        Value::Array(values) => Value::Array(values.iter().map(canonicalize_json_value).collect()),
+        Value::Object(map) => {
+            let mut entries: Vec<_> = map.iter().collect();
+            entries.sort_by(|left, right| left.0.cmp(right.0));
+            let mut normalized = serde_json::Map::new();
+            for (key, value) in entries {
+                normalized.insert(key.clone(), canonicalize_json_value(value));
+            }
+            Value::Object(normalized)
+        }
+        other => other.clone(),
     }
 }
 

@@ -13,13 +13,43 @@ use axum::{
 use core_infra::InMemorySurrealDb;
 use tower::util::ServiceExt;
 
-fn app() -> Router {
+fn app_with_db() -> (Router, Arc<InMemorySurrealDb>) {
     let db = Arc::new(InMemorySurrealDb::new());
-    build_router(AppState::for_memory_ingest_test(
+    let app = build_router(AppState::for_memory_ingest_test(
         AppConfig::for_test(),
         ProbeSnapshot::ready(),
-        db,
-    ))
+        db.clone(),
+    ));
+    (app, db)
+}
+
+fn app() -> Router {
+    app_with_db().0
+}
+
+fn open_badges_schema_entry() -> serde_json::Value {
+    serde_json::json!({
+        "id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+        "type": "1EdTechJsonSchemaValidator2019"
+    })
+}
+
+fn clr_schema_entry() -> serde_json::Value {
+    serde_json::json!({
+        "id": "https://purl.imsglobal.org/spec/clr/v2p0/schema/json/clr_v2p0_clrcredential_schema.json",
+        "type": "1EdTechJsonSchemaValidator2019"
+    })
+}
+
+fn data_integrity_proof() -> serde_json::Value {
+    serde_json::json!({
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-rdfc-2022",
+        "created": "2025-01-01T00:00:00Z",
+        "verificationMethod": "did:key:z6MkmProofExample#z6MkmProofExample",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5CexampleProofValue"
+    })
 }
 
 fn open_badges_payload(id: &str, name: &str) -> serde_json::Value {
@@ -33,6 +63,7 @@ fn open_badges_payload(id: &str, name: &str) -> serde_json::Value {
         "name": name,
         "issuer": "https://issuer.example.com/issuers/1",
         "validFrom": "2025-01-01T00:00:00Z",
+        "credentialSchema": [open_badges_schema_entry()],
         "credentialSubject": {
             "type": "AchievementSubject",
             "achievement": {
@@ -42,7 +73,8 @@ fn open_badges_payload(id: &str, name: &str) -> serde_json::Value {
                 "description": "Awarded for Rust basics",
                 "criteria": {}
             }
-        }
+        },
+        "proof": [data_integrity_proof()]
     })
 }
 
@@ -58,6 +90,7 @@ fn clr_payload(id: &str, name: &str) -> serde_json::Value {
         "name": name,
         "issuer": "https://issuer.example.com/issuers/1",
         "validFrom": "2025-01-01T00:00:00Z",
+        "credentialSchema": [clr_schema_entry()],
         "credentialSubject": {
             "type": "ClrSubject",
             "verifiableCredential": [
@@ -83,13 +116,14 @@ fn clr_payload(id: &str, name: &str) -> serde_json::Value {
                     }
                 }
             ]
-        }
+        },
+        "proof": [data_integrity_proof()]
     })
 }
 
 #[tokio::test]
 async fn register_and_retrieve_open_badges_json() {
-    let app = app();
+    let (app, db) = app_with_db();
     let body = open_badges_payload("https://example.com/credential/1", "Rust Badge").to_string();
     let response = app
         .clone()
@@ -126,6 +160,10 @@ async fn register_and_retrieve_open_badges_json() {
     assert_eq!(
         payload["source_metadata"]["system"]["original_standard_id"],
         "https://example.com/credential/1"
+    );
+    assert_eq!(
+        payload["source_metadata"]["system"]["verification"]["certification_envelope"],
+        "passed"
     );
 
     let source_response = app
@@ -169,6 +207,21 @@ async fn register_and_retrieve_open_badges_json() {
     )
     .unwrap();
     assert_eq!(item_payload["content"], body);
+
+    let stored_credential = db
+        .get_standard_credential(source_id.parse().unwrap())
+        .expect("direct-standard credential should be stored");
+    assert_eq!(stored_credential.family, "openbadges");
+    assert_eq!(
+        stored_credential.credential_id,
+        "https://example.com/credential/1"
+    );
+    assert_eq!(stored_credential.raw_body, body);
+    assert_eq!(stored_credential.proofs.len(), 1);
+    assert_eq!(
+        stored_credential.credential_schema[0]["id"],
+        "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json"
+    );
 }
 
 #[tokio::test]
@@ -370,6 +423,65 @@ async fn invalid_standard_envelope_returns_bad_request() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn certification_level_standard_validation_requires_proof_and_pinned_schema() {
+    let missing_proof = open_badges_payload("https://example.com/credential/no-proof", "No Proof");
+    let missing_proof = serde_json::json!({
+        "@context": missing_proof["@context"].clone(),
+        "id": missing_proof["id"].clone(),
+        "type": missing_proof["type"].clone(),
+        "name": missing_proof["name"].clone(),
+        "issuer": missing_proof["issuer"].clone(),
+        "validFrom": missing_proof["validFrom"].clone(),
+        "credentialSchema": missing_proof["credentialSchema"].clone(),
+        "credentialSubject": missing_proof["credentialSubject"].clone()
+    });
+    let missing_schema = serde_json::json!({
+        "@context": open_badges_payload("https://example.com/credential/no-schema", "No Schema")["@context"].clone(),
+        "id": "https://example.com/credential/no-schema",
+        "type": ["VerifiableCredential", "AchievementCredential"],
+        "name": "No Schema",
+        "issuer": "https://issuer.example.com/issuers/1",
+        "validFrom": "2025-01-01T00:00:00Z",
+        "credentialSubject": {
+            "type": "AchievementSubject",
+            "achievement": {
+                "id": "https://example.com/achievements/no-schema",
+                "type": "Achievement",
+                "name": "No Schema",
+                "criteria": {}
+            }
+        },
+        "proof": [data_integrity_proof()]
+    });
+
+    let missing_proof_response = app()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/sources/register")
+                .header("content-type", "application/json")
+                .body(Body::from(missing_proof.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(missing_proof_response.status(), StatusCode::BAD_REQUEST);
+
+    let missing_schema_response = app()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/sources/register")
+                .header("content-type", "application/json")
+                .body(Body::from(missing_schema.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(missing_schema_response.status(), StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]

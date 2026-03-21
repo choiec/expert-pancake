@@ -244,7 +244,9 @@ components:
         - type
         - id
         - credentialSubject
+        - credentialSchema
         - issuer
+        - proof
         - validFrom
       properties:
         '@context':
@@ -270,11 +272,27 @@ components:
         credentialSubject:
           type: object
           additionalProperties: true
+        credentialSchema:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
         issuer:
           oneOf:
             - type: string
             - type: object
               additionalProperties: true
+        proof:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
         validFrom:
           type: string
           format: date-time
@@ -290,7 +308,9 @@ components:
         - id
         - name
         - credentialSubject
+        - credentialSchema
         - issuer
+        - proof
         - validFrom
       properties:
         '@context':
@@ -313,11 +333,27 @@ components:
         credentialSubject:
           type: object
           additionalProperties: true
+        credentialSchema:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
         issuer:
           oneOf:
             - type: string
             - type: object
               additionalProperties: true
+        proof:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items:
+                type: object
+                additionalProperties: true
         validFrom:
           type: string
           format: date-time
@@ -517,6 +553,9 @@ components:
           type: string
         semantic_payload_hash:
           type: string
+        verification:
+          type: object
+          additionalProperties: true
     IndexingStatus:
       type: string
       enum: [queued, indexed, deferred]
