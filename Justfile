@@ -21,6 +21,7 @@ test-full:
 verify-story feature="001-memory-ingest":
 	case "{{feature}}" in \
 	  001-memory-ingest) \
+	    mkdir -p target/llvm-cov && \
 	    cargo nextest run --workspace --all-targets --all-features && \
 	    cargo llvm-cov nextest --workspace --all-features --lcov --output-path target/llvm-cov/{{feature}}.info \
 	  ;; \
@@ -33,6 +34,7 @@ mutants:
 	cargo mutants --workspace --test-tool nextest
 
 coverage:
+	mkdir -p target/llvm-cov
 	cargo llvm-cov nextest --workspace --all-features --lcov --output-path target/llvm-cov/lcov.info
 
 bench:

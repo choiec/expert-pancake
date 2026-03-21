@@ -42,7 +42,7 @@ jobs:
       - name: Full Tests
         run: cargo nextest run --workspace --all-targets --all-features --profile ci
       - name: Coverage
-        run: cargo llvm-cov nextest --workspace --all-features --lcov --output-path target/llvm-cov/lcov.info
+        run: mkdir -p target/llvm-cov && cargo llvm-cov nextest --workspace --all-features --lcov --output-path target/llvm-cov/lcov.info
       - name: Mutants
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         run: cargo mutants --workspace --test-tool nextest
