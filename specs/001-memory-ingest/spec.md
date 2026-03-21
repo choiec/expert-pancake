@@ -1,171 +1,167 @@
-# Feature Specification: Memory Ingest and Canonical Source Identity
+# Feature Specification: Schema-Native Standard Credential Registry
 
 **Feature Branch**: `001-memory-ingest`  
 **Created**: 2026-03-17  
 **Updated**: 2026-03-21  
 **Status**: IMPLEMENT-READY
 
+## Purpose
+
+Replace the current canonical `Source` / `MemoryItem` public model with a schema-native credential API. The authoritative write and read surface is now the supported standard credential document itself, not a protocol-neutral wrapper.
+
 ## Context
 
-`001-memory-ingest` established the first authoritative ingest path for canonical/manual documents and direct-standard JSON payloads. The follow-up identity work that lived in `002-canonical-source-external-id` on `main` is now folded back into this feature branch and specification set instead of being carried as a separate spec folder.
+The current slice already accepts direct Open Badges and CLR payloads, but its public contract still exposes service-owned wrapper concepts such as canonical `external_id`, internal `source_id`, derived `memory_items`, and provenance envelopes. This redesign removes that compatibility layer and makes the supported credential schema the public contract.
 
-This merged slice defines one authoritative vertical slice:
+The expected outcome is:
 
-- canonical/manual ingest plus direct Open Badges and CLR ingest
-- one canonical public `external_id` model
-- one deterministic internal `source_id`
-- one replay/conflict rule based on semantic payload equality
-- one protocol-neutral `Source` plus `MemoryItem` storage model
-- one consistent provenance envelope returned from registration and retrieval
-
-The expected outcome is that equivalent requests converge on the same logical source, retrieval stays byte-accurate for authoritative memory-item content, and public contracts expose canonical identity plus provenance without leaking migration-only or adapter-only state.
+- one authoritative public identifier: the standard credential `id`
+- one authoritative document shape: the supported credential envelope with official top-level schema keys only
+- one replay rule: same `id` plus semantic payload equality replays successfully
+- one conflict rule: same `id` plus semantic payload difference returns `409 Conflict`
+- one authoritative retrieval shape: the stored schema-exact credential document
 
 ## Goals
 
-- **G1**: Accept canonical/manual and direct-standard ingest through `POST /sources/register`.
-- **G2**: Normalize accepted content into deterministic `MemoryItem` records.
-- **G3**: Persist authoritative `Source` and `MemoryItem` state before returning success.
-- **G4**: Resolve replay, conflict, and authoritative retrieval decisions from canonical identity plus semantic payload hash.
-- **G5**: Keep search explicitly non-authoritative while still exposing a usable projection API.
-- **G6**: Expose consistent retrieval, search, health, readiness, and operator-facing documentation contracts.
-- **G7**: Keep the vertical slice runnable and verifiable end-to-end through documented quickstart and smoke flows.
+- **G1**: Accept supported standard credential payloads as first-class authoritative write requests.
+- **G2**: Persist authoritative credential records using only official top-level schema keys and official key names.
+- **G3**: Make the standard credential `id` the public retrieval key and remove service-owned canonical identity wrappers from the public API.
+- **G4**: Resolve replay and conflict decisions from standard credential identity plus semantic payload equality.
+- **G5**: Keep search non-authoritative while aligning its projection vocabulary with schema-native credential concepts.
+- **G6**: Preserve health and readiness contracts that reflect authoritative write-path health separately from search health.
+- **G7**: Keep the slice runnable and verifiable end-to-end through updated machine-readable contracts, quickstart flows, and automated tests.
 
-## Non-goals
+## Non-Goals
 
-- Legacy identifier migration, alias lookup, or mixed-population compatibility.
-- Additional direct-standard families beyond Open Badges and CLR.
-- Binary/media ingest, UI work, LLM enrichment, or batch ingest.
-- Making search authoritative for replay, conflict, or retrieval decisions.
+- Canonical/manual ingest for text or markdown documents.
+- Public `source_id`, `external_id`, `urn`, `memory_item`, or `indexing_status` fields.
+- Raw-body retrieval guarantees for authoritative read APIs.
+- Compatibility aliases or migration shims for the previous `/sources/*` or `/memory-items/*` contract family.
+- Standard families beyond the pinned Open Badges 3.0 and CLR 2.0 credential envelopes.
 
-## Clarifications
+## User Scenarios & Testing
 
-### Session 2026-03-17
+### User Story 1 - Register a standard credential (Priority: P1)
 
-- Direct-standard ingest accepts Open Badges and CLR payloads as first-class request bodies.
-- Accepted direct-standard payloads persist as `document_type = json` and derive one `json_document` memory item.
-- Retrieval of a direct-standard memory item returns the preserved first-commit UTF-8 request body exactly as stored.
-- Formatting-only JSON changes do not create duplicates because replay uses deterministic normalized JSON hashing.
+A producer submits an Open Badges or CLR credential and receives the authoritative schema-native credential representation back.
 
-### Session 2026-03-19
+**Why this priority**: This is the core business value of the slice. Without authoritative registration, the rest of the system has nothing stable to retrieve or project.
 
-- The canonical public source identity model from `002-canonical-source-external-id` is merged into this slice rather than tracked in a separate spec folder.
-- Public `external_id` values are canonical project-owned URIs under `https://api.cherry-pick.net/...`.
-- Internal `source_id` remains distinct from `external_id` and is deterministically derived from canonical identity.
-- Original direct-standard payload identifiers are preserved only as provenance metadata.
+**Independent Test**: Submit valid Open Badges and CLR credentials to the registration endpoint and verify that the response returns the authoritative credential document with only official top-level schema keys.
 
-## User Stories
+**Acceptance Scenarios**:
 
-### User Story 1 - Register a source with canonical identity (P1)
+1. **Given** a valid Open Badges credential, **When** registration succeeds, **Then** the response is `201 Created` and the body is the authoritative credential document keyed only by official schema fields.
+2. **Given** a valid CLR credential, **When** registration succeeds, **Then** the response is `201 Created` and the body is the authoritative credential document keyed only by official schema fields.
+3. **Given** a credential payload that includes unsupported top-level fields, **When** registration is attempted, **Then** the request is rejected before persistence.
 
-A source producer submits a canonical/manual or direct-standard request and receives one authoritative source identity plus derived memory items.
+### User Story 2 - Replay equivalent submissions without duplicates (Priority: P1)
 
-**Acceptance scenarios**
+A producer resubmits the same logical credential and receives the existing authoritative record rather than creating duplicates.
 
-1. Given a canonical/manual request with an already-canonical `external_id`, when registration succeeds, then the response returns the canonical `external_id`, deterministic `source_id`, `indexing_status`, and derived memory-item summaries.
-2. Given a valid Open Badges or CLR payload, when registration succeeds, then the response returns `document_type = json`, one `json_document` memory item, and provenance metadata describing canonical identity version, ingest kind, semantic payload hash, and original standard identifier when present.
+**Why this priority**: Replay safety is required for reliable ingest and for concurrent producer behavior.
 
-### User Story 2 - Replay equivalent submissions without duplicates (P1)
+**Independent Test**: Register the same credential twice with formatting-only JSON differences and verify that the second request returns `200 OK` and does not create a second authoritative record.
 
-A source producer resubmits the same logical source and receives the existing authoritative source rather than creating duplicates.
+**Acceptance Scenarios**:
 
-**Acceptance scenarios**
+1. **Given** an existing authoritative credential with the same standard `id`, **When** the producer resubmits a semantically equivalent payload, **Then** the system returns `200 OK` with the existing authoritative credential and does not create duplicate state.
+2. **Given** an existing authoritative credential with the same standard `id`, **When** the producer submits a semantically different payload, **Then** the system returns `409 Conflict` and leaves authoritative state unchanged.
 
-1. Given an existing canonical identity and semantically equivalent payload, when the request is replayed, then the system returns the existing authoritative identifiers and does not create duplicate source or memory-item rows.
-2. Given an existing canonical identity and semantically different payload, when the request is submitted, then the system returns `409 Conflict` and leaves authoritative state unchanged.
+### User Story 3 - Retrieve authoritative credential documents (Priority: P1)
 
-### User Story 3 - Retrieve canonical identity with provenance (P1)
+A consumer retrieves a stored credential using the official credential identifier and receives the authoritative schema-native document without wrapper-specific fields.
 
-A consumer retrieves a source or memory item and can distinguish canonical source identity from original upstream provenance.
+**Why this priority**: Registration is not useful unless consumers can later retrieve the same authoritative credential state directly.
 
-**Acceptance scenarios**
+**Independent Test**: Register a credential, retrieve it by its official `id`, and verify that the returned document matches the stored authoritative schema-exact record.
 
-1. Given a direct-standard source, when `GET /sources/{source-id}` succeeds, then the response includes canonical `external_id` plus provenance under `source_metadata.system`.
-2. Given a stored memory item, when `GET /memory-items/{urn}` succeeds, then the response returns authoritative content and source metadata consistent with the registration result.
+**Acceptance Scenarios**:
 
-### User Story 4 - Search projection remains non-authoritative (P2)
+1. **Given** a stored supported credential, **When** retrieval by its official `id` succeeds, **Then** the response body contains the authoritative credential document and no service-owned wrapper fields.
+2. **Given** an unknown credential `id`, **When** retrieval is attempted, **Then** the system returns `404 Not Found`.
 
-A consumer searches memory-item projections while authoritative replay and retrieval continue to be governed by the authoritative store.
+### User Story 4 - Search credential projections without changing authority (Priority: P2)
 
-**Acceptance scenarios**
+A consumer searches credential summaries while authoritative registration and retrieval remain governed only by the authoritative credential store.
 
-1. Given indexed content, when `GET /search/memory-items` is queried, then the response returns projection hits with preview-only fields.
-2. Given search degradation, when registration and authoritative retrieval continue to work, then search may return `503` without changing authoritative replay or conflict behavior.
+**Why this priority**: Search improves usability, but it must not redefine what the authoritative credential is.
+
+**Independent Test**: Query the search endpoint and verify that it returns projection hits built from credential data, while authoritative registration and retrieval continue to work when search is degraded.
+
+**Acceptance Scenarios**:
+
+1. **Given** indexed credentials, **When** the credential search endpoint is queried, **Then** the response returns projection hits derived from stored credential data.
+2. **Given** search degradation, **When** registration and authoritative retrieval are exercised, **Then** both continue to work and search may return `503 Service Unavailable`.
 
 ## Edge Cases
 
-- Canonical/manual ingest provides a non-canonical `external_id`.
-- Direct-standard ingest is shape-valid but cannot be classified or mapped into canonical identity.
-- Formatting-only JSON replay keeps semantic equality and must replay successfully.
-- Semantic payload changes for the same canonical identity must conflict.
-- Concurrent equivalent requests must converge on one authoritative source.
-- Search projection lag must not change authoritative replay or retrieval decisions.
+- A credential omits the required standard `id`.
+- A credential uses the same `id` as an existing stored credential but belongs to a semantically different document.
+- A credential includes non-standard top-level keys.
+- A payload is schema-valid JSON but cannot be classified to exactly one supported family.
+- Two concurrent requests register the same credential at nearly the same time.
+- Search indexing is delayed or unavailable after a successful authoritative write.
 
-## Functional Requirements
+## Requirements
 
-- **FR-001**: `POST /sources/register` MUST accept either canonical/manual JSON or supported direct-standard JSON (Open Badges or CLR).
-- **FR-002**: Canonical/manual ingest MUST accept only already-canonical `external_id` values under the project-owned URI namespace.
-- **FR-003**: Direct-standard ingest MUST derive canonical `external_id` from trusted source-domain context plus the original upstream identifier and MUST preserve the original upstream identifier as provenance.
-- **FR-004**: The system MUST derive one deterministic internal `source_id` from canonical `external_id` and MUST keep `source_id` distinct from `external_id`.
-- **FR-005**: Replay and conflict decisions MUST use canonical `external_id` plus semantic payload equivalence; raw formatting differences alone MUST NOT create conflicts.
-- **FR-006**: A replay with the same canonical identity and same semantic payload MUST return the existing authoritative source and MUST NOT create duplicate rows.
-- **FR-007**: A submission with the same canonical identity and different semantic payload MUST return `409 Conflict` and MUST NOT overwrite authoritative state.
-- **FR-008**: Accepted direct-standard payload bodies MUST be preserved exactly as the first successful authoritative body and exposed through one derived `json_document` memory item.
-- **FR-009**: Registration and retrieval responses MUST expose one public provenance shape under `source_metadata.system` containing `canonical_id_version`, `ingest_kind`, `semantic_payload_hash`, and `original_standard_id` when present.
-- **FR-010**: Authoritative storage and retrieval contracts MUST remain protocol-neutral after ingest normalization.
-- **FR-011**: `GET /sources/{source-id}` MUST return source metadata and all associated memory items ordered by ascending `sequence`.
-- **FR-012**: `GET /memory-items/{urn}` MUST return authoritative content and item metadata exactly as committed.
-- **FR-013**: `GET /search/memory-items` MUST return projection hits only and MUST remain non-authoritative.
-- **FR-014**: `/health` MUST be local-only liveness and `/ready` MUST reflect authoritative write-path readiness plus search degradation.
-- **FR-015**: Public contracts MUST NOT expose migration-only aliases, alternate identity paths, or compatibility-only fields.
+### Functional Requirements
 
-## Non-Functional Requirements
+- **FR-001**: `POST /credentials/register` MUST accept supported Open Badges 3.0 and CLR 2.0 credential payloads as first-class authoritative requests.
+- **FR-002**: The system MUST reject unsupported credential families and unsupported top-level fields before any authoritative persistence occurs.
+- **FR-003**: The authoritative public identity for a stored credential MUST be the official standard `id` field from the accepted credential.
+- **FR-004**: The system MUST persist authoritative credential documents using only official top-level keys defined by the pinned family schema and MUST preserve the official schema key names exactly.
+- **FR-005**: The system MUST preserve the accepted nested content under official top-level keys without introducing derived top-level fields into the authoritative credential document.
+- **FR-006**: Replay and conflict decisions MUST use the standard credential `id` plus semantic payload equivalence; formatting-only JSON differences MUST NOT create conflicts.
+- **FR-007**: A replay with the same credential `id` and the same semantic payload MUST return the existing authoritative credential and MUST NOT create duplicate rows.
+- **FR-008**: A submission with the same credential `id` and a different semantic payload MUST return `409 Conflict` and MUST NOT overwrite authoritative state.
+- **FR-009**: `GET /credentials/{credential-id}` MUST return the authoritative stored credential document without service-owned wrapper fields.
+- **FR-010**: The public authoritative API MUST NOT expose `source_id`, `external_id`, `urn`, `memory_items`, `source_metadata`, or compatibility-only aliases.
+- **FR-011**: `GET /credentials/search` MUST return projection hits only and MUST remain non-authoritative.
+- **FR-012**: `/health` MUST be local-only liveness and `/ready` MUST reflect authoritative write-path readiness while allowing search degradation to be reported separately.
+- **FR-013**: Public contracts MUST remain machine-readable and must pin the schema-native request and response shapes used by registration, retrieval, search, and probes.
 
-- **NC-001**: Registration requests for representative canonical/manual and direct-standard payloads under 100 KB MUST meet a p95 latency target of 5 seconds or less in release validation.
-- **NC-002**: Authoritative retrieval requests for representative stored sources and memory items MUST meet a p95 latency target of 200 ms or less in release validation.
-- **NC-003**: Search projection queries against the representative benchmark corpus MUST meet a p95 latency target of 500 ms or less in release validation.
-- **NC-004**: Performance-sensitive changes in this slice MUST produce reproducible benchmark or load evidence for latency, throughput, and error rate before release.
-- **NC-005**: Concurrent duplicate registrations across stateless app instances MUST converge on one authoritative source outcome without data divergence.
-- **NC-006**: Authoritative writes MUST be transactional and leave no partial authoritative state behind after timeout, conflict, or storage failure.
-- **NC-007**: Search indexing and projection behavior MUST remain non-authoritative; search degradation or backlog MUST NOT block authoritative registration or retrieval.
-- **NC-009**: All public endpoints MUST emit structured logs, request correlation, traces, and latency metrics sufficient for operational diagnosis.
-- **NC-010**: `/health` and `/ready` MUST expose distinct liveness versus readiness semantics and response shapes.
-- **NC-011**: Logs, metrics, and error payloads MUST avoid raw authoritative content and arbitrary caller metadata that could leak sensitive information.
-- **NC-012**: Supported standard payloads MUST be validated at the HTTP boundary against pinned allow or reject rules before any authoritative persistence occurs.
-- **NC-016**: Authoritative source, memory-item, and indexing records in this slice MUST default to a no-TTL, no-automatic-purge retention baseline unless a later spec changes that policy.
+### Non-Functional Requirements
 
-## Data Model Summary
+- **NC-001**: Registration requests for representative supported credential payloads under 100 KB MUST meet a p95 latency target of 5 seconds or less in release validation.
+- **NC-002**: Authoritative retrieval requests for representative stored credentials MUST meet a p95 latency target of 200 ms or less in release validation.
+- **NC-003**: Credential search projection queries against the representative benchmark corpus MUST meet a p95 latency target of 500 ms or less in release validation.
+- **NC-004**: Concurrent duplicate registrations across stateless app instances MUST converge on one authoritative credential outcome without data divergence.
+- **NC-005**: Authoritative writes MUST be transactional and leave no partial authoritative state behind after timeout, conflict, or storage failure.
+- **NC-006**: Search indexing and projection behavior MUST remain non-authoritative; search degradation or backlog MUST NOT block authoritative registration or retrieval.
+- **NC-007**: Supported credential payloads MUST be validated against pinned allow or reject rules before any authoritative persistence occurs.
+- **NC-008**: Logs, metrics, and error payloads MUST avoid emitting full credential bodies or arbitrary caller metadata that could leak sensitive information.
+- **NC-009**: Authoritative credential records in this slice MUST default to a no-TTL, no-automatic-purge retention baseline unless a later spec changes that policy.
 
-### Source
+### Key Entities
 
-- `source_id`: deterministic internal identifier derived from canonical identity
-- `external_id`: canonical project-owned URI
-- `title`, `summary`, `document_type`, `created_at`, `updated_at`
-- `source_metadata.system`: canonical provenance metadata
+- **Standard Credential Record**: The authoritative stored credential document keyed by the official standard `id` and containing only official top-level schema keys for the supported family.
+- **Credential Search Projection**: A non-authoritative search document derived from authoritative credential data and safe to rebuild from the authoritative store.
+- **Credential Index Job**: The durable outbox record that links a committed authoritative credential write to asynchronous search projection work.
 
-### Memory Item
+## Success Criteria
 
-- `urn`, `source_id`, `sequence`, `unit_type`, `start_offset`, `end_offset`, `version`
-- `content`, `content_hash`, `created_at`, `updated_at`, `item_metadata`
-- direct-standard ingest always yields exactly one `json_document`
+### Measurable Outcomes
 
-### Search Projection
-
-- `urn`, `source_id`, `sequence`, `document_type`, `content_preview`, `content_hash`, timestamps
-- rebuildable from authoritative source state
+- **SC-001**: Producers can register representative Open Badges and CLR credentials and receive schema-native authoritative responses without wrapper-specific fields.
+- **SC-002**: Equivalent replays of the same credential `id` return the existing authoritative record without creating duplicates in 100% of tested replay scenarios.
+- **SC-003**: Conflicting submissions for the same credential `id` return `409 Conflict` without mutating stored authoritative state in 100% of tested conflict scenarios.
+- **SC-004**: Consumers can retrieve stored credentials by official `id` and receive the authoritative schema-exact document in 100% of tested retrieval scenarios.
+- **SC-005**: Search degradation does not change authoritative registration or retrieval outcomes in the documented smoke and integration flows.
 
 ## Acceptance Criteria
 
-- **AC-001**: Canonical/manual registration succeeds only for canonical project-owned `external_id` values.
-- **AC-002**: Direct-standard registration returns canonical `external_id` and preserves original upstream identifier separately as provenance.
-- **AC-003**: Equivalent replays return the same authoritative `source_id` and canonical `external_id` without duplicates.
-- **AC-004**: Semantic conflicts for the same canonical identity return `409` without mutating authoritative state.
-- **AC-005**: Retrieval returns the same canonical identity and provenance shape that registration established.
-- **AC-006**: Direct-standard retrieval returns the preserved first-commit raw body through the single `json_document` item.
-- **AC-007**: Search degradation does not change authoritative write, replay, or retrieval outcomes.
+- **AC-001**: Registration succeeds only for supported Open Badges 3.0 and CLR 2.0 credential payloads.
+- **AC-002**: Successful authoritative responses expose only schema-native credential fields and no service-owned wrapper fields.
+- **AC-003**: Equivalent replays return the same authoritative credential document without duplicates.
+- **AC-004**: Semantic conflicts for the same credential `id` return `409 Conflict` without mutating authoritative state.
+- **AC-005**: Retrieval by official `id` returns the authoritative schema-exact credential document.
+- **AC-006**: Search remains projection-only and does not alter authoritative write or read behavior.
+- **AC-007**: Health and readiness endpoints keep distinct liveness versus dependency-aware semantics after the redesign.
 
 ## Test Strategy
 
-- Crate-local tests cover canonicalization, normalization, replay hashing, and response mapping close to the owning crates.
-- Contract tests pin request and response schemas for registration, retrieval, search, health, and readiness.
-- Integration tests cover canonical/manual ingest, direct-standard ingest, replay, conflict, retrieval consistency, and projection behavior.
+- Contract tests pin the schema-native registration, retrieval, search, health, and readiness shapes.
+- Integration tests cover Open Badges and CLR registration, replay, conflict, retrieval, and degraded-search behavior.
+- Storage adapter contract tests cover schema-exact persistence, uniqueness, rollback, and retention guarantees.
 - Performance verification remains a release gate for registration, retrieval, and search latency targets.

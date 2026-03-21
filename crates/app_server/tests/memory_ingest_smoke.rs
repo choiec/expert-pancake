@@ -161,11 +161,6 @@ async fn register_and_retrieve_open_badges_json() {
         payload["source_metadata"]["system"]["original_standard_id"],
         "https://example.com/credential/1"
     );
-    assert_eq!(
-        payload["source_metadata"]["system"]["verification"]["certification_envelope"],
-        "passed"
-    );
-
     let source_response = app
         .clone()
         .oneshot(
@@ -211,17 +206,18 @@ async fn register_and_retrieve_open_badges_json() {
     let stored_credential = db
         .get_standard_credential(source_id.parse().unwrap())
         .expect("direct-standard credential should be stored");
-    assert_eq!(stored_credential.family, "openbadges");
+    assert_eq!(stored_credential["id"], "https://example.com/credential/1");
     assert_eq!(
-        stored_credential.credential_id,
-        "https://example.com/credential/1"
-    );
-    assert_eq!(stored_credential.raw_body, body);
-    assert_eq!(stored_credential.proofs.len(), 1);
-    assert_eq!(
-        stored_credential.credential_schema[0]["id"],
+        stored_credential["credentialSchema"][0]["id"],
         "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json"
     );
+    assert_eq!(stored_credential["proof"][0]["type"], "DataIntegrityProof");
+    assert_eq!(
+        stored_credential["credentialSubject"]["type"],
+        "AchievementSubject"
+    );
+    assert!(stored_credential.get("source_id").is_none());
+    assert!(stored_credential.get("verification").is_none());
 }
 
 #[tokio::test]

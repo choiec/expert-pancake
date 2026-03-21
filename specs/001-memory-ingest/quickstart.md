@@ -1,34 +1,24 @@
-# Quickstart: Memory Ingest with Canonical Source Identity
+# Quickstart: Schema-Native Standard Credential Registry
 
 **Status**: IMPLEMENT-READY
 
 ## Purpose
 
-This quickstart documents the local validation flow for the merged `001-memory-ingest` slice after canonical source identity governance was folded in from `002`.
+Document the local validation flow for the schema-native credential redesign.
 
 ## Prerequisites
 
 - Rust stable toolchain with edition 2024 support
 - Docker and Docker Compose or equivalent local containers
 - `curl` for HTTP checks
-- `cargo-nextest`, `cargo-llvm-cov`, and `cargo-mutants` installed locally for the standard verification loop
+- `cargo-nextest`, `cargo-llvm-cov`, and `cargo-mutants` installed locally
 
 ## Local RED -> GREEN -> REFACTOR -> VERIFY Loop
 
 1. Start from the next unchecked `RED` task in `tasks.md` and write or tighten the failing test.
 2. Implement the smallest change that turns that one failing proof green.
-3. Refactor only after the failing proof is green and keep I/O behind trait boundaries.
+3. Refactor only after the failing proof is green.
 4. Run the story gate with `just test-fast` during the inner loop and `just verify-story 001-memory-ingest` before moving the task to done.
-
-## Toolchain Mapping
-
-- `cargo nextest`: default fast and full runner for the feature's unit, integration, and contract tests
-- `proptest`: normalization, identity, and replay-hash invariants
-- `insta`: stable HTTP body and contract snapshots
-- `mockall`: trait-boundary isolation for repository or adapter-facing unit tests
-- `cargo-mutants`: story-level regression proof for domain and application logic
-- `cargo-llvm-cov`: coverage evidence for merge and release gates
-- `criterion`: optional latency regression gate once the benchmark artifact exists
 
 ## Environment
 
@@ -61,65 +51,57 @@ just mutants
 just coverage
 ```
 
-## Smoke Test: Canonical Manual Ingest
+## Smoke Test: Register an Open Badges Credential
 
 ```bash
-curl -i http://127.0.0.1:3000/sources/register \
-  -H 'content-type: application/json' \
-  --data '{
-    "title": "Axum Plan",
-    "summary": "Planning notes",
-    "external-id": "https://api.cherry-pick.net/qti/v3p0/kice.re.kr:20240621",
-    "document-type": "markdown",
-    "content": "# Intro\n\nHello world\n\n# Next\n\nMore text",
-    "metadata": {"topic": "planning"}
-  }'
-```
-
-Expected behavior:
-
-- `201 Created` for first registration
-- `200 OK` for semantic replay
-- `409 Conflict` for the same canonical identity with semantically different content
-
-## Smoke Test: Direct Standard Ingest
-
-```bash
-curl -i http://127.0.0.1:3000/sources/register \
+curl -i http://127.0.0.1:3000/credentials/register \
   -H 'content-type: application/json' \
   --data '{
     "@context": ["https://www.w3.org/ns/credentials/v2"],
     "type": ["VerifiableCredential", "OpenBadgeCredential"],
     "id": "urn:example:badge:001",
     "name": "Rust Badge",
-    "issuer": {"id": "https://issuer.example.org"}
+    "issuer": {"id": "https://issuer.example.org"},
+    "credentialSubject": {"achievement": {"name": "Rust Badge"}},
+    "proof": {"type": "DataIntegrityProof"},
+    "validFrom": "2026-01-01T00:00:00Z"
   }'
 ```
 
 Expected behavior:
 
-- response returns canonical `external_id`
-- `source_metadata.system.ingest_kind = direct_standard`
-- `source_metadata.system.original_standard_id` preserves the upstream `id`
-- one derived `json_document` memory item is returned
-- formatting-only JSON replay resolves to the same authoritative source
+- `201 Created` for first registration
+- response body is the authoritative credential document itself
+- no `source_id`, `external_id`, `memory_items`, or `source_metadata` fields appear
 
-## Retrieval Checks
+## Smoke Test: Replay the Same Credential
+
+Resubmit the same credential with harmless JSON formatting changes.
+
+Expected behavior:
+
+- `200 OK` for semantic replay
+- no duplicate authoritative row is created
+
+## Smoke Test: Retrieve an Authoritative Credential
 
 ```bash
-curl -i http://127.0.0.1:3000/sources/{source_id}
-curl -i http://127.0.0.1:3000/memory-items/{urn}
+curl -i 'http://127.0.0.1:3000/credentials/urn%3Aexample%3Abadge%3A001'
 ```
 
 Expected behavior:
 
-- source retrieval returns canonical identity plus provenance metadata
-- memory-item retrieval returns authoritative stored content exactly as committed
+- retrieval succeeds by official credential `id`
+- response body is the stored schema-exact credential document
+- no wrapper-specific fields are returned
 
 ## Search Check
 
 ```bash
-curl -i 'http://127.0.0.1:3000/search/memory-items?q=rust&limit=10'
+curl -i 'http://127.0.0.1:3000/credentials/search?q=rust&limit=10'
 ```
 
-Search returns projection hits only. Search degradation may return `503` without changing authoritative write or retrieval behavior.
+Expected behavior:
+
+- search returns projection hits derived from credential data
+- search degradation may return `503` without changing authoritative registration or retrieval behavior

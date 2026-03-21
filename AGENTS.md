@@ -253,13 +253,13 @@ When generating code:
 
 This section is maintained by `.specify/scripts/bash/update-agent-context.sh codex` during planning work.
 
-- Last updated: not yet generated
-- Active feature: not yet generated
-- Language/Version: not yet generated
-- Primary Dependencies: not yet generated
-- Storage: not yet generated
-- Testing: not yet generated
-- Project Type: not yet generated
+- Last updated: 2026-03-21
+- Active feature: 001-memory-ingest
+- Language/Version: Rust stable, edition 2024
+- Primary Dependencies: `axum`, `tokio`, `tower`, `tower-http`, `serde`, `serde_json`, `validator`, `uuid`, `sha2`, `tracing`, `tracing-subscriber`, `thiserror`, `surrealdb`, `meilisearch-sdk`
+- Storage: SurrealDB for authoritative credential persistence plus durable indexing outbox; Meilisearch for search projection only
+- Testing: `cargo nextest`, contract tests, integration tests, adapter contract tests, `cargo-llvm-cov`, `cargo-mutants`
+- Project Type: Multi-crate Rust web service
 <!-- END AUTO-GENERATED CODEX CONTEXT -->
 
 ---

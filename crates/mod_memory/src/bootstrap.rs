@@ -4,9 +4,8 @@ use std::{
 };
 
 use core_infra::surrealdb::{
-    CommitRegistrationOutcome, InMemorySurrealDb, PersistedCredentialProofRecord,
-    PersistedMemoryItemRecord, PersistedSourceRecord, PersistedStandardCredentialRecord,
-    SearchProjectionRecord,
+    CommitRegistrationOutcome, InMemorySurrealDb, PersistedMemoryItemRecord, PersistedSourceRecord,
+    PersistedStandardCredentialRecord, SearchProjectionRecord,
 };
 use core_shared::{AppError, AppResult, DefaultIdGenerator, IdGenerator};
 use jsonschema::Validator;
@@ -122,7 +121,7 @@ impl MemoryModule {
 
     pub fn register_source(&self, raw_body: &str) -> AppResult<RegisterSourceOutcome> {
         let started_at = OffsetDateTime::now_utc();
-        let parsed = parse_register_payload(raw_body, started_at)?;
+        let parsed = parse_register_payload(raw_body)?;
         let source = parsed.canonical;
         let source_id = derive_source_id(&source.external_id);
         let normalized = normalize_source(
@@ -210,10 +209,7 @@ impl MemoryModule {
     }
 }
 
-fn parse_register_payload(
-    raw_body: &str,
-    started_at: OffsetDateTime,
-) -> AppResult<ParsedRegistration> {
+fn parse_register_payload(raw_body: &str) -> AppResult<ParsedRegistration> {
     let value: Value = serde_json::from_str(raw_body)
         .map_err(|_| AppError::validation("request body must be valid json"))?;
 
@@ -255,13 +251,7 @@ fn parse_register_payload(
                 external_id,
                 document_type,
                 content,
-                metadata: attach_system_metadata(
-                    user_metadata,
-                    "canonical",
-                    &canonical_hash,
-                    None,
-                    None,
-                ),
+                metadata: attach_system_metadata(user_metadata, "canonical", &canonical_hash, None),
                 canonical_hash,
             },
             standard_credential: None,
@@ -269,7 +259,7 @@ fn parse_register_payload(
     }
 
     let family = validate_and_classify_standard_payload(&value)?;
-    let verification = validate_standard_credential_for_certification(&value, family)?;
+    validate_standard_credential_for_certification(&value, family)?;
     let title = standard_title(&value, family)?;
     let original_standard_id = required_string(&value, "id")?;
     let source_domain = trusted_source_domain(&value, &original_standard_id)?;
@@ -289,24 +279,10 @@ fn parse_register_payload(
                 "direct_standard",
                 &canonical_hash,
                 Some(original_standard_id.clone()),
-                Some(verification.clone()),
             ),
             canonical_hash: canonical_hash.clone(),
         },
-        standard_credential: Some(build_standard_credential_record(
-            derive_source_id(&canonical_external_id_for_standard(
-                family,
-                &source_domain,
-                &original_standard_id,
-            )),
-            family,
-            &value,
-            raw_body,
-            &title,
-            &canonical_hash,
-            verification,
-            started_at,
-        )?),
+        standard_credential: Some(build_standard_credential_record(family, &value)?),
     })
 }
 
@@ -344,7 +320,7 @@ fn validate_and_classify_standard_payload(value: &Value) -> AppResult<StandardFa
 fn validate_standard_credential_for_certification(
     value: &Value,
     family: StandardFamily,
-) -> AppResult<Value> {
+) -> AppResult<()> {
     let contexts = string_tokens(value.get("@context"));
     let missing_contexts = required_contexts_for(family)
         .into_iter()
@@ -417,7 +393,6 @@ fn validate_standard_credential_for_certification(
         "Ed25519Signature2020",
         "JsonWebSignature2020",
     ];
-    let mut proof_summaries = Vec::with_capacity(proofs.len());
     for proof in &proofs {
         let proof_type = required_object_string(proof, "type")?;
         if !supported_proof_types.contains(&proof_type.as_str()) {
@@ -447,7 +422,7 @@ fn validate_standard_credential_for_certification(
             .with_error_code("INVALID_STANDARD_PAYLOAD"));
         }
 
-        let created = required_object_string(proof, "created")?;
+        let _created = required_object_string(proof, "created")?;
         let has_jws = proof
             .get("jws")
             .and_then(Value::as_str)
@@ -464,86 +439,23 @@ fn validate_standard_credential_for_certification(
             )
             .with_error_code("INVALID_STANDARD_PAYLOAD"));
         }
-
-        proof_summaries.push(json!({
-            "type": proof_type,
-            "proof_purpose": proof_purpose,
-            "verification_method": verification_method,
-            "created": created,
-            "cryptographic_verification": "not_performed",
-        }));
     }
 
-    Ok(json!({
-        "certification_envelope": "passed",
-        "credential_schema": "passed",
-        "proofs": proof_summaries,
-        "cryptographic_verification": "not_performed",
-    }))
+    Ok(())
 }
 
 fn build_standard_credential_record(
-    source_id: Uuid,
     family: StandardFamily,
     value: &Value,
-    raw_body: &str,
-    title: &str,
-    _canonical_hash: &str,
-    verification: Value,
-    created_at: OffsetDateTime,
 ) -> AppResult<PersistedStandardCredentialRecord> {
-    let credential_id = required_string(value, "id")?;
-    let issuer_id = issuer_id(value)?;
-    let subject_id = value
-        .get("credentialSubject")
-        .and_then(|subject| subject.get("id"))
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_owned);
-    let proofs = proof_entries(value)?
-        .into_iter()
-        .map(|proof| {
-            Ok(PersistedCredentialProofRecord {
-                proof_type: required_object_string(&proof, "type")?,
-                proof_purpose: required_object_string(&proof, "proofPurpose")?,
-                verification_method: required_object_string(&proof, "verificationMethod")?,
-                created: optional_object_string(&proof, "created"),
-                cryptosuite: optional_object_string(&proof, "cryptosuite"),
-                proof_value: optional_object_string(&proof, "proofValue"),
-                jws: optional_object_string(&proof, "jws"),
-                payload: proof,
-            })
-        })
-        .collect::<AppResult<Vec<_>>>()?;
-
-    Ok(PersistedStandardCredentialRecord {
-        source_id,
-        family: family.as_str().to_owned(),
-        version: family.default_version().to_owned(),
-        credential_id,
-        credential_name: title.to_owned(),
-        issuer_id,
-        subject_id,
-        raw_body: raw_body.to_owned(),
-        raw_body_hash: sha256_hex(raw_body),
-        envelope: value.clone(),
-        normalized_envelope: canonicalize_json_value(value),
-        credential_subject: value
-            .get("credentialSubject")
-            .cloned()
-            .unwrap_or_else(|| json!({})),
-        achievement: value.pointer("/credentialSubject/achievement").cloned(),
-        credential_schema: json_array(value.get("credentialSchema")),
-        credential_status: json_array(value.get("credentialStatus")),
-        evidence: json_array(value.get("evidence")),
-        refresh_service: json_array(value.get("refreshService")),
-        terms_of_use: json_array(value.get("termsOfUse")),
-        proofs,
-        verification,
-        created_at,
-        updated_at: created_at,
-    })
+    let filtered = canonicalize_json_value(&filter_schema_fields(value, family));
+    if filtered.is_object() {
+        Ok(filtered)
+    } else {
+        Err(AppError::internal(
+            "supported-standard payload must remain a json object after schema filtering",
+        ))
+    }
 }
 
 fn standard_title(value: &Value, family: StandardFamily) -> AppResult<String> {
@@ -680,15 +592,6 @@ fn required_object_string(value: &Value, key: &str) -> AppResult<String> {
         })
 }
 
-fn optional_object_string(value: &Value, key: &str) -> Option<String> {
-    value
-        .get(key)
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_owned)
-}
-
 fn schema_errors(validator: &Validator, value: &Value) -> Vec<String> {
     validator
         .iter_errors(value)
@@ -765,7 +668,6 @@ fn attach_system_metadata(
     ingest_kind: &str,
     semantic_payload_hash: &str,
     original_standard_id: Option<String>,
-    verification: Option<Value>,
 ) -> Value {
     let mut metadata = match metadata {
         Value::Object(map) => map,
@@ -779,7 +681,6 @@ fn attach_system_metadata(
             "ingest_kind": ingest_kind,
             "semantic_payload_hash": semantic_payload_hash,
             "original_standard_id": original_standard_id,
-            "verification": verification,
         }),
     );
 
@@ -834,6 +735,64 @@ fn canonicalize_json_value(value: &Value) -> Value {
         }
         other => other.clone(),
     }
+}
+
+fn filter_schema_fields(value: &Value, family: StandardFamily) -> Value {
+    let allowed_keys: &[&str] = match family {
+        StandardFamily::OpenBadges => &[
+            "@context",
+            "awardedDate",
+            "credentialSchema",
+            "credentialStatus",
+            "credentialSubject",
+            "description",
+            "endorsement",
+            "endorsementJwt",
+            "evidence",
+            "id",
+            "image",
+            "issuer",
+            "name",
+            "proof",
+            "refreshService",
+            "termsOfUse",
+            "type",
+            "validFrom",
+            "validUntil",
+        ],
+        StandardFamily::Clr => &[
+            "@context",
+            "awardedDate",
+            "credentialSchema",
+            "credentialStatus",
+            "credentialSubject",
+            "description",
+            "endorsement",
+            "endorsementJwt",
+            "evidence",
+            "id",
+            "image",
+            "issuer",
+            "name",
+            "partial",
+            "proof",
+            "refreshService",
+            "termsOfUse",
+            "type",
+            "validFrom",
+            "validUntil",
+        ],
+    };
+
+    let mut filtered = serde_json::Map::new();
+    if let Value::Object(map) = value {
+        for key in allowed_keys {
+            if let Some(entry) = map.get(*key) {
+                filtered.insert((*key).to_owned(), entry.clone());
+            }
+        }
+    }
+    Value::Object(filtered)
 }
 
 fn into_persisted_memory_item(item: MemoryItem) -> PersistedMemoryItemRecord {

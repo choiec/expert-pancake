@@ -46,43 +46,7 @@ pub struct PersistedSourceRecord {
     pub updated_at: OffsetDateTime,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PersistedCredentialProofRecord {
-    pub proof_type: String,
-    pub proof_purpose: String,
-    pub verification_method: String,
-    pub created: Option<String>,
-    pub cryptosuite: Option<String>,
-    pub proof_value: Option<String>,
-    pub jws: Option<String>,
-    pub payload: Value,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PersistedStandardCredentialRecord {
-    pub source_id: Uuid,
-    pub family: String,
-    pub version: String,
-    pub credential_id: String,
-    pub credential_name: String,
-    pub issuer_id: String,
-    pub subject_id: Option<String>,
-    pub raw_body: String,
-    pub raw_body_hash: String,
-    pub envelope: Value,
-    pub normalized_envelope: Value,
-    pub credential_subject: Value,
-    pub achievement: Option<Value>,
-    pub credential_schema: Vec<Value>,
-    pub credential_status: Vec<Value>,
-    pub evidence: Vec<Value>,
-    pub refresh_service: Vec<Value>,
-    pub terms_of_use: Vec<Value>,
-    pub proofs: Vec<PersistedCredentialProofRecord>,
-    pub verification: Value,
-    pub created_at: OffsetDateTime,
-    pub updated_at: OffsetDateTime,
-}
+pub type PersistedStandardCredentialRecord = Value;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PersistedMemoryItemRecord {

@@ -1,59 +1,53 @@
 openapi: 3.1.0
 info:
-  title: Memory Ingest API
-  version: 0.2.0
-  summary: Memory ingest plus canonical source identity contract.
+  title: Schema-Native Credential Registry API
+  version: 0.3.0
+  summary: Schema-native Open Badges and CLR credential ingest contract.
   description: >-
-    Public contract for canonical/manual and direct-standard ingest after
-    canonical source identity governance was folded into the 001 slice.
+    Public contract for authoritative registration and retrieval of supported
+    standard credential documents without service-owned wrapper fields.
 servers:
   - url: http://127.0.0.1:3000
 paths:
-  /sources/register:
+  /credentials/register:
     post:
-      summary: Register a source document and derive memory items.
-      description: >-
-        Canonical/manual ingest accepts only already-canonical external ids.
-        Direct-standard ingest derives canonical external ids, preserves the
-        original payload id as provenance metadata, and computes replay
-        semantics from canonical identity plus semantic payload hash.
-      operationId: registerSource
+      summary: Register a supported standard credential.
+      operationId: registerCredential
       requestBody:
         required: true
         content:
           application/json:
             schema:
               oneOf:
-                - $ref: '#/components/schemas/CanonicalRegisterRequest'
-                - $ref: '#/components/schemas/OpenBadgesRegisterRequest'
-                - $ref: '#/components/schemas/ClrRegisterRequest'
+                - $ref: '#/components/schemas/OpenBadgesCredential'
+                - $ref: '#/components/schemas/ClrCredential'
       responses:
         '200':
-          description: Idempotent replay of an existing authoritative source.
+          description: Idempotent replay of an existing authoritative credential.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegisterSourceResponse'
+                $ref: '#/components/schemas/AuthoritativeCredential'
         '201':
-          description: New source registered successfully.
+          description: New credential registered successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegisterSourceResponse'
+                $ref: '#/components/schemas/AuthoritativeCredential'
         '400':
-          description: Invalid canonical identity input or unmappable supported-standard payload.
+          description: Invalid payload or unsupported top-level fields.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '408':
-          description: Normalization timeout.
+          description: Validation timeout.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Canonical external id already exists with a semantically different payload.
+          description: Credential id already exists with a semantically different payload.
           content:
             application/json:
               schema:
@@ -70,26 +64,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /sources/{source-id}:
+  /credentials/{credential-id}:
     get:
-      summary: Retrieve a source and all associated memory items.
-      operationId: getSource
+      summary: Retrieve an authoritative credential by official id.
+      operationId: getCredential
       parameters:
-        - name: source-id
+        - name: credential-id
           in: path
           required: true
+          description: URL-encoded standard credential id.
           schema:
             type: string
-            format: uuid
       responses:
         '200':
-          description: Source found.
+          description: Credential found.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SourceResponse'
+                $ref: '#/components/schemas/AuthoritativeCredential'
         '404':
-          description: Source not found.
+          description: Credential not found.
           content:
             application/json:
               schema:
@@ -100,58 +94,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /memory-items/{urn}:
+  /credentials/search:
     get:
-      summary: Retrieve a memory item by URN.
-      operationId: getMemoryItem
-      parameters:
-        - name: urn
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Memory item found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MemoryItemResponse'
-        '404':
-          description: Memory item not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '503':
-          description: Authoritative storage unavailable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /search/memory-items:
-    get:
-      summary: Search memory-item projections.
-      description: Returns projection hits only; authoritative retrieval remains on source and memory-item endpoints.
-      operationId: searchMemoryItems
+      summary: Search credential projections.
+      operationId: searchCredentials
       parameters:
         - name: q
           in: query
           required: false
           schema:
             type: string
-        - name: source-id
+        - name: family
           in: query
           required: false
           schema:
             type: string
-            format: uuid
-        - name: document-type
+            enum: [open_badges_v3, clr_v2]
+        - name: issuer-id
           in: query
           required: false
           schema:
             type: string
-            enum: [text, markdown, json]
         - name: limit
           in: query
           required: false
@@ -173,7 +136,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SearchResponse'
+                $ref: '#/components/schemas/CredentialSearchResponse'
         '503':
           description: Search unavailable.
           content:
@@ -193,7 +156,7 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
   /ready:
     get:
-      summary: Dependency-aware readiness probe for the write path.
+      summary: Dependency-aware readiness probe for the authoritative write path.
       operationId: getReady
       responses:
         '200':
@@ -210,399 +173,202 @@ paths:
                 $ref: '#/components/schemas/ReadinessResponse'
 components:
   schemas:
-    CanonicalRegisterRequest:
+    AuthoritativeCredential:
+      oneOf:
+        - $ref: '#/components/schemas/OpenBadgesCredential'
+        - $ref: '#/components/schemas/ClrCredential'
+    StandardCredentialEnvelope:
       type: object
-      required:
-        - title
-        - external-id
-        - document-type
-        - content
-      properties:
-        title:
-          type: string
-          minLength: 1
-        summary:
-          type: string
-        external-id:
-          type: string
-          pattern: '^https://api\.cherry-pick\.net/[a-z0-9]+/v[0-9]+p[0-9]+(?:p[0-9]+)?/[^:]+:.+$'
-        document-type:
-          type: string
-          enum: [text, markdown]
-        content:
-          type: string
-        metadata:
-          type: object
-          additionalProperties: true
-    OpenBadgesRegisterRequest:
-      type: object
-      description: >-
-        Supported direct-standard Open Badges payloads must satisfy the pinned
-        1EdTech Open Badges 3.0 AchievementCredential JSON-LD envelope.
-      required:
-        - '@context'
-        - type
-        - id
-        - credentialSubject
-        - credentialSchema
-        - issuer
-        - proof
-        - validFrom
+      additionalProperties: false
       properties:
         '@context':
           oneOf:
             - type: string
             - type: array
+              items: {}
+        awardedDate:
+          type: string
+        credentialSchema:
+          oneOf:
+            - type: object
+            - type: array
               items:
-                type: string
-        type:
+                type: object
+        credentialStatus:
+          oneOf:
+            - type: object
+            - type: array
+              items:
+                type: object
+        credentialSubject:
+          type: object
+        description:
+          oneOf:
+            - type: string
+            - type: object
+        endorsement:
+          oneOf:
+            - type: object
+            - type: array
+              items:
+                type: object
+        endorsementJwt:
           oneOf:
             - type: string
             - type: array
               items:
                 type: string
-        id:
-          type: string
-          description: Original standard payload identifier preserved as provenance only.
-        name:
-          type: string
-          description: >-
-            Optional wallet-facing credential name. When omitted, canonical
-            title derivation falls back to `credentialSubject.achievement.name`.
-        credentialSubject:
-          type: object
-          additionalProperties: true
-        credentialSchema:
+        evidence:
           oneOf:
             - type: object
-              additionalProperties: true
             - type: array
               items:
                 type: object
-                additionalProperties: true
+        id:
+          type: string
+        image:
+          oneOf:
+            - type: string
+            - type: object
         issuer:
           oneOf:
             - type: string
             - type: object
-              additionalProperties: true
+        name:
+          oneOf:
+            - type: string
+            - type: object
+        partial:
+          type: boolean
         proof:
           oneOf:
             - type: object
-              additionalProperties: true
             - type: array
               items:
                 type: object
-                additionalProperties: true
-        validFrom:
-          type: string
-          format: date-time
-      additionalProperties: true
-    ClrRegisterRequest:
-      type: object
-      description: >-
-        Supported direct-standard CLR payloads must satisfy the pinned 1EdTech
-        CLR 2.0 ClrCredential JSON-LD envelope.
-      required:
-        - '@context'
-        - type
-        - id
-        - name
-        - credentialSubject
-        - credentialSchema
-        - issuer
-        - proof
-        - validFrom
-      properties:
-        '@context':
+        refreshService:
           oneOf:
-            - type: string
+            - type: object
             - type: array
               items:
-                type: string
+                type: object
+        termsOfUse:
+          oneOf:
+            - type: object
+            - type: array
+              items:
+                type: object
         type:
           oneOf:
             - type: string
             - type: array
-              items:
-                type: string
-        id:
-          type: string
-          description: Original standard payload identifier preserved as provenance only.
-        name:
-          type: string
-        credentialSubject:
-          type: object
-          additionalProperties: true
-        credentialSchema:
-          oneOf:
-            - type: object
-              additionalProperties: true
-            - type: array
-              items:
-                type: object
-                additionalProperties: true
-        issuer:
-          oneOf:
-            - type: string
-            - type: object
-              additionalProperties: true
-        proof:
-          oneOf:
-            - type: object
-              additionalProperties: true
-            - type: array
-              items:
-                type: object
-                additionalProperties: true
+              items: {}
         validFrom:
           type: string
-          format: date-time
-      additionalProperties: true
-    RegisterSourceResponse:
-      type: object
-      required:
-        - source_id
-        - external_id
-        - document_type
-        - indexing_status
-        - source_metadata
-        - memory_items
-      properties:
-        source_id:
+        validUntil:
           type: string
-          format: uuid
-        external_id:
-          type: string
-        document_type:
-          type: string
-          enum: [text, markdown, json]
-        indexing_status:
-          $ref: '#/components/schemas/IndexingStatus'
-        source_metadata:
-          $ref: '#/components/schemas/SourceMetadataEnvelope'
-        memory_items:
-          type: array
-          items:
-            $ref: '#/components/schemas/MemoryItemSummary'
-    MemoryItemSummary:
-      type: object
-      required:
-        - urn
-        - sequence
-        - unit_type
-      properties:
-        urn:
-          type: string
-        sequence:
-          type: integer
-          minimum: 0
-        unit_type:
-          $ref: '#/components/schemas/MemoryUnitType'
-    SourceResponse:
-      type: object
-      required:
-        - source_id
-        - external_id
-        - title
-        - document_type
-        - source_metadata
-        - memory_items
-      properties:
-        source_id:
-          type: string
-          format: uuid
-        external_id:
-          type: string
-        title:
-          type: string
-        summary:
-          type: string
-        document_type:
-          type: string
-          enum: [text, markdown, json]
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        indexing_status:
-          $ref: '#/components/schemas/IndexingStatus'
-        source_metadata:
-          $ref: '#/components/schemas/SourceMetadataEnvelope'
-        memory_items:
-          type: array
-          items:
-            $ref: '#/components/schemas/MemoryItemResponse'
-    MemoryItemResponse:
-      type: object
-      required:
-        - urn
-        - source_id
-        - sequence
-        - content
-        - item_metadata
-        - created_at
-      properties:
-        urn:
-          type: string
-        source_id:
-          type: string
-          format: uuid
-        sequence:
-          type: integer
-          minimum: 0
-        content:
-          type: string
-        item_metadata:
-          type: object
+    OpenBadgesCredential:
+      allOf:
+        - $ref: '#/components/schemas/StandardCredentialEnvelope'
+        - type: object
           required:
-            - unit_type
-            - start_offset
-            - end_offset
-            - version
-          properties:
-            unit_type:
-              $ref: '#/components/schemas/MemoryUnitType'
-            start_offset:
-              type: integer
-              minimum: 0
-            end_offset:
-              type: integer
-              minimum: 0
-            version:
-              type: string
-          additionalProperties: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        source_metadata:
-          type: object
-          additionalProperties: true
-    SearchResponse:
+            - '@context'
+            - type
+            - id
+            - issuer
+            - credentialSubject
+            - proof
+            - validFrom
+    ClrCredential:
+      allOf:
+        - $ref: '#/components/schemas/StandardCredentialEnvelope'
+        - type: object
+          required:
+            - '@context'
+            - type
+            - id
+            - issuer
+            - name
+            - credentialSubject
+            - proof
+            - validFrom
+    CredentialSearchResponse:
       type: object
       required:
-        - total
+        - items
         - limit
         - offset
-        - items
       properties:
-        total:
-          type: integer
-          minimum: 0
-        limit:
-          type: integer
-          minimum: 1
-        offset:
-          type: integer
-          minimum: 0
         items:
           type: array
           items:
-            $ref: '#/components/schemas/SearchHit'
-    SearchHit:
+            $ref: '#/components/schemas/CredentialSearchHit'
+        limit:
+          type: integer
+        offset:
+          type: integer
+    CredentialSearchHit:
       type: object
       required:
-        - urn
-        - source_id
-        - sequence
-        - document_type
-        - content_preview
+        - credential
       properties:
-        urn:
+        credential:
+          type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+            type:
+              oneOf:
+                - type: string
+                - type: array
+                  items: {}
+            name:
+              oneOf:
+                - type: string
+                - type: object
+            issuer:
+              oneOf:
+                - type: string
+                - type: object
+            validFrom:
+              type: string
+        family:
           type: string
-        source_id:
-          type: string
-          format: uuid
-        sequence:
-          type: integer
-          minimum: 0
-        document_type:
-          type: string
-          enum: [text, markdown, json]
-        content_preview:
-          type: string
+          enum: [open_badges_v3, clr_v2]
         score:
           type: number
-          format: float
-    SourceMetadataEnvelope:
-      type: object
-      required:
-        - system
-      properties:
-        system:
-          $ref: '#/components/schemas/SourceSystemMetadata'
-      additionalProperties: true
-    SourceSystemMetadata:
-      type: object
-      required:
-        - canonical_id_version
-        - ingest_kind
-        - semantic_payload_hash
-      properties:
-        canonical_id_version:
+        preview:
           type: string
-          enum: [v1]
-        ingest_kind:
-          type: string
-          enum: [canonical, direct_standard]
-        original_standard_id:
-          type: string
-        semantic_payload_hash:
-          type: string
-        verification:
-          type: object
-          additionalProperties: true
-    IndexingStatus:
-      type: string
-      enum: [queued, indexed, deferred]
-    MemoryUnitType:
-      type: string
-      enum: [paragraph, section, json_document, metadata_placeholder]
     HealthResponse:
       type: object
       required:
         - status
-        - components
+        - service
       properties:
         status:
           type: string
-          enum: [ready]
-        components:
-          type: object
-          required:
-            - service
-          properties:
-            service:
-              $ref: '#/components/schemas/ComponentStatus'
+          enum: [ok]
+        service:
+          type: string
+          enum: [alive]
     ReadinessResponse:
       type: object
       required:
         - status
-        - components
+        - authoritative_store
+        - search
       properties:
         status:
           type: string
-          enum: [ready, degraded, down]
-        components:
-          type: object
-          required:
-            - service
-            - database
-            - search
-          properties:
-            service:
-              $ref: '#/components/schemas/ComponentStatus'
-            database:
-              $ref: '#/components/schemas/ComponentStatus'
-            search:
-              $ref: '#/components/schemas/ComponentStatus'
-    ComponentStatus:
-      type: string
-      enum: [ready, degraded, down]
+          enum: [ready, degraded, unavailable]
+        authoritative_store:
+          type: string
+          enum: [ready, unavailable]
+        search:
+          type: string
+          enum: [ready, degraded, unavailable]
     ErrorResponse:
       type: object
       required:
@@ -618,11 +384,8 @@ components:
         details:
           oneOf:
             - type: object
-              additionalProperties: true
             - type: array
-              items:
-                type: object
-                additionalProperties: true
+              items: {}
         timestamp:
           type: string
           format: date-time
