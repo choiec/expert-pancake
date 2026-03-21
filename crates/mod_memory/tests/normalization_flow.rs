@@ -34,5 +34,8 @@ fn text_normalization_uses_utf8_byte_offsets() {
 fn formatting_only_json_replays_share_hash() {
     let compact = r#"{"id":"1","name":"A","type":"AchievementCredential","@context":"https://purl.imsglobal.org/spec/ob/v3p0/context.json"}"#;
     let pretty = "{\n  \"name\": \"A\",\n  \"type\": \"AchievementCredential\",\n  \"@context\": \"https://purl.imsglobal.org/spec/ob/v3p0/context.json\",\n  \"id\": \"1\"\n}";
-    assert_eq!(normalized_json_hash(compact).unwrap(), normalized_json_hash(pretty).unwrap());
+    assert_eq!(
+        normalized_json_hash(compact).unwrap(),
+        normalized_json_hash(pretty).unwrap()
+    );
 }

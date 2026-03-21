@@ -11,7 +11,8 @@ use crate::config::AppConfig;
 pub struct AppState {
     config: AppConfig,
     memory_module: MemoryModule,
-    probe_snapshot: ProbeSnapshot,
+    db: Arc<InMemorySurrealDb>,
+    search_enabled: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,9 +31,18 @@ pub struct ProbeSnapshot {
 }
 
 impl AppState {
-    pub async fn bootstrap(_config: AppConfig) -> Result<Self, StartupError> {
-        Err(StartupError::MissingEnv {
-            key: "runtime bootstrap is not configured in this slice".to_owned(),
+    pub async fn bootstrap(config: AppConfig) -> Result<Self, StartupError> {
+        let db = Arc::new(InMemorySurrealDb::new());
+        let search_enabled = !config.meilisearch.http_addr.trim().is_empty()
+            && !config.meilisearch.master_key.trim().is_empty();
+        db.set_search_available(search_enabled);
+        let memory_module =
+            MemoryModule::fixture(db.clone(), config.timeouts.normalization_timeout);
+        Ok(Self {
+            config,
+            memory_module,
+            db,
+            search_enabled,
         })
     }
 
@@ -41,11 +51,13 @@ impl AppState {
         probe_snapshot: ProbeSnapshot,
         db: Arc<InMemorySurrealDb>,
     ) -> Self {
-        let memory_module = MemoryModule::fixture(db, config.timeouts.normalization_timeout);
+        let memory_module =
+            MemoryModule::fixture(db.clone(), config.timeouts.normalization_timeout);
         Self {
             config,
             memory_module,
-            probe_snapshot,
+            db,
+            search_enabled: probe_snapshot.search != ProbeStatus::Down,
         }
     }
 
@@ -58,7 +70,17 @@ impl AppState {
     }
 
     pub async fn readiness(&self) -> ProbeSnapshot {
-        self.probe_snapshot
+        let database = if self.db.readiness_probe().is_ok() {
+            ProbeStatus::Ready
+        } else {
+            ProbeStatus::Down
+        };
+        let search = if self.search_enabled {
+            ProbeStatus::Ready
+        } else {
+            ProbeStatus::Degraded
+        };
+        ProbeSnapshot::new(ProbeStatus::Ready, database, search)
     }
 }
 

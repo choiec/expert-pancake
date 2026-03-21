@@ -24,13 +24,15 @@ pub async fn search_memory_items(
     State(state): State<AppState>,
     Query(params): Query<SearchParams>,
 ) -> Response {
-    match state.memory_ingest().search_memory_items(mod_memory::SearchQuery {
-        q: params.q,
-        source_id: params.source_id,
-        document_type: params.document_type,
-        limit: params.limit.unwrap_or(20).min(100),
-        offset: params.offset.unwrap_or(0),
-    }) {
+    match state
+        .memory_ingest()
+        .search_memory_items(mod_memory::SearchQuery {
+            q: params.q,
+            source_id: params.source_id,
+            document_type: params.document_type,
+            limit: params.limit.unwrap_or(20).min(100),
+            offset: params.offset.unwrap_or(0),
+        }) {
         Ok(result) => Json(json!({
             "total": result.total,
             "limit": result.limit,

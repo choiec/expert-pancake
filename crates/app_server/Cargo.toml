@@ -18,3 +18,9 @@ tower-http.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+insta.workspace = true
+mockall.workspace = true
+proptest.workspace = true

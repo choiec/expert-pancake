@@ -12,7 +12,9 @@ pub async fn health(State(_state): State<AppState>) -> Json<serde_json::Value> {
     }))
 }
 
-pub async fn ready(State(state): State<AppState>) -> (axum::http::StatusCode, Json<serde_json::Value>) {
+pub async fn ready(
+    State(state): State<AppState>,
+) -> (axum::http::StatusCode, Json<serde_json::Value>) {
     let snapshot = state.readiness().await;
     let status = if snapshot.database == ProbeStatus::Down {
         axum::http::StatusCode::SERVICE_UNAVAILABLE

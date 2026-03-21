@@ -39,7 +39,11 @@ Non‑functional goals:
 - **Dependency discipline**: Avoid transitive dependency bloat; prefer small, well‑maintained crates.
 
 ### 4. Testing Discipline
+- **Test-first is mandatory**: Implementation starts with a failing test or executable check tied to the relevant spec requirement, acceptance criterion, or plan risk; code follows only after the RED state is observed.
+- **RED -> GREEN -> REFACTOR -> VERIFY task flow**: Task breakdowns must decompose each deliverable into a failing test, minimal implementation, structural cleanup, and an explicit verification step.
 - **Unit vs integration vs contract**: Unit tests validate isolated logic; integration tests validate end‑to‑end behavior across module boundaries; contract tests validate external API contracts (HTTP/GraphQL/Storage) and adapters.
+- **Acceptance criteria to test mapping**: Acceptance criteria must map to executable checks wherever practical, using unit tests, property tests, snapshot or approval tests, contract tests, or benchmarks when they best fit the behavior being proven.
+- **Trait-boundary isolation**: External I/O and side effects must stay behind trait boundaries so domain and application logic can be validated with fast unit tests and mocks without requiring live infrastructure.
 - **Storage adapter verification**: Each storage adapter (SurrealDB, FalkorDB, Meilisearch) must have a suite of contract tests that verify the adapter meets its declared guarantees (e.g., schema expectations, indexing behavior, query semantics).
 - **API contract tests**: Public API surfaces (Axum routes, external integrations) must have automated contract tests asserting request/response shape, status codes, and error semantics.
 - **Test data hygiene**: Tests must avoid flaky global state by using isolated fixtures, in‑memory instances, or disposable test databases.
@@ -61,17 +65,25 @@ Non‑functional goals:
 - **API contracts**: Public APIs must have machine‑readable contract documents (e.g., OpenAPI, JSON Schema) and human‑readable summaries.
 - **Onboarding & runbooks**: Key operational playbooks (setup, local development, deployments, incident response) must be documented and kept current.
 
+### 8. Development Workflow & Quality Gates
+- **Spec-driven implementation loop**: `spec.md` defines behavior, `plan.md` defines architecture and verification strategy, `tasks.md` defines executable RED/GREEN/REFACTOR/VERIFY steps, and implementation must stay traceable back to those artifacts.
+- **Tooling baseline**: Local and CI verification must standardize on `cargo-nextest` for test execution, `proptest` for invariants, `insta` for stable serialized outputs, `mockall` for trait-boundary isolation, `cargo-mutants` for mutation testing, `cargo-llvm-cov` for coverage, and `criterion` when performance regression measurement is required.
+- **Minimum merge gate**: Changes cannot merge until formatting, linting, fast tests, and all story-relevant verification gates pass. Slower coverage, mutation, and benchmark checks must have a documented trigger and recovery path.
+- **Artifact/test consistency**: Specs, plans, tasks, quickstarts, and automated tests must describe the same shipped behavior. When one changes, the others must be updated or the mismatch must be called out explicitly.
+
 ## Definition of Done
 A change is done when all of the following are true:
 - Code is implemented in accordance with the relevant spec and plan.
 - Automated tests (unit + integration + contract where applicable) pass.
+- The change has passed the minimum quality gate for its scope: formatting, linting, fast tests, and any required story-specific property, snapshot, contract, mutation, coverage, or benchmark checks.
 - Code is reviewed and approved via the repository’s standard PR process.
-- Documentation is updated (spec, plan, tasks, README, ADRs) for the change.
+- Documentation and executable verification are updated together (spec, plan, tasks, README, ADRs, tests, fixtures, snapshots) for the change.
 - Performance regressions have been evaluated for non‑trivial changes affecting runtime behavior.
 - Dependencies are updated responsibly (no unchecked upgrades that bypass review).
 
 ## Non‑Negotiables
 - No changes are merged without automated tests covering the behavior.
+- No implementation starts from GREEN first; the failing check must exist before the production change is considered in progress.
 - No secret or credential is committed into version control.
 - No shortcut around the established handler/service/repository boundary.
 - Security and privacy expectations are enforced by default; exceptions require explicit documented risk acceptance.
@@ -83,4 +95,4 @@ This constitution is the authoritative source for project governance. Every chan
 - **Versioning**: Governance versions follow semantic versioning: major bumps for breaking governance changes, minor for new principles or policy expansions, patch for clarifications.
 - **Compliance review**: Every PR should include a short statement describing how it complies with the relevant constitution principles; reviewers should verify compliance.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-17 | **Last Amended**: 2026-03-17
+**Version**: 1.1.0 | **Ratified**: 2026-03-17 | **Last Amended**: 2026-03-21

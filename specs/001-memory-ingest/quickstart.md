@@ -11,6 +11,24 @@ This quickstart documents the local validation flow for the merged `001-memory-i
 - Rust stable toolchain with edition 2024 support
 - Docker and Docker Compose or equivalent local containers
 - `curl` for HTTP checks
+- `cargo-nextest`, `cargo-llvm-cov`, and `cargo-mutants` installed locally for the standard verification loop
+
+## Local RED -> GREEN -> REFACTOR -> VERIFY Loop
+
+1. Start from the next unchecked `RED` task in `tasks.md` and write or tighten the failing test.
+2. Implement the smallest change that turns that one failing proof green.
+3. Refactor only after the failing proof is green and keep I/O behind trait boundaries.
+4. Run the story gate with `just test-fast` during the inner loop and `just verify-story 001-memory-ingest` before moving the task to done.
+
+## Toolchain Mapping
+
+- `cargo nextest`: default fast and full runner for the feature's unit, integration, and contract tests
+- `proptest`: normalization, identity, and replay-hash invariants
+- `insta`: stable HTTP body and contract snapshots
+- `mockall`: trait-boundary isolation for repository or adapter-facing unit tests
+- `cargo-mutants`: story-level regression proof for domain and application logic
+- `cargo-llvm-cov`: coverage evidence for merge and release gates
+- `criterion`: optional latency regression gate once the benchmark artifact exists
 
 ## Environment
 
@@ -29,6 +47,18 @@ export MEILI_MASTER_KEY=local-dev-key
 
 ```bash
 cargo run -p app_server
+```
+
+## Standard Validation Commands
+
+```bash
+just fmt
+just lint
+just test-fast
+just test-full
+just verify-story 001-memory-ingest
+just mutants
+just coverage
 ```
 
 ## Smoke Test: Canonical Manual Ingest

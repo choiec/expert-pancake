@@ -1,8 +1,8 @@
 use std::{sync::Arc, time::Duration};
 
 use core_infra::surrealdb::{
-    CommitRegistrationOutcome, InMemorySurrealDb, PersistedMemoryItemRecord,
-    PersistedSourceRecord, SearchProjectionRecord,
+    CommitRegistrationOutcome, InMemorySurrealDb, PersistedMemoryItemRecord, PersistedSourceRecord,
+    SearchProjectionRecord,
 };
 use core_shared::{AppError, AppResult, DefaultIdGenerator, IdGenerator};
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,10 @@ use uuid::Uuid;
 use crate::domain::{
     memory_item::MemoryItem,
     normalization::{NormalizationInput, normalize_source, normalized_json_hash, sha256_hex},
-    source::{CanonicalSource, DocumentType},
+    source::{
+        CANONICAL_ID_VERSION, CanonicalSource, DocumentType, StandardFamily,
+        canonical_external_id_for_standard, derive_source_id, is_canonical_external_id,
+    },
 };
 
 #[derive(Clone)]
@@ -99,7 +102,7 @@ impl MemoryModule {
     pub fn register_source(&self, raw_body: &str) -> AppResult<RegisterSourceOutcome> {
         let started_at = OffsetDateTime::now_utc();
         let source = parse_register_payload(raw_body)?;
-        let source_id = self.id_generator.new_uuid();
+        let source_id = derive_source_id(&source.external_id);
         let normalized = normalize_source(
             &NormalizationInput {
                 source_id,
@@ -135,7 +138,9 @@ impl MemoryModule {
             .map(into_persisted_memory_item)
             .collect();
 
-        let committed = self.db.commit_registration(persisted_source, persisted_items)?;
+        let committed = self
+            .db
+            .commit_registration(persisted_source, persisted_items)?;
         match committed {
             CommitRegistrationOutcome::Created(bundle) => Ok(RegisterSourceOutcome {
                 created: true,
@@ -202,14 +207,19 @@ fn parse_register_payload(raw_body: &str) -> AppResult<CanonicalSource> {
         };
         let content = required_string(&value, "content")?;
         let summary = optional_string(&value, "summary");
-        let metadata = value.get("metadata").cloned().unwrap_or_else(|| json!({}));
+        if !is_canonical_external_id(&external_id) {
+            return Err(AppError::validation(
+                "canonical/manual ingest requires a canonical project-owned external-id",
+            ));
+        }
+        let user_metadata = metadata_object(&value)?;
         let canonical_hash = sha256_hex(&canonical_json_shape(&json!({
-            "title": title,
-            "summary": summary,
-            "external-id": external_id,
+            "title": &title,
+            "summary": &summary,
+            "external-id": &external_id,
             "document-type": document_type.as_str(),
-            "content": content,
-            "metadata": metadata,
+            "content": &content,
+            "metadata": &user_metadata,
         })));
         return Ok(CanonicalSource {
             title,
@@ -217,16 +227,18 @@ fn parse_register_payload(raw_body: &str) -> AppResult<CanonicalSource> {
             external_id,
             document_type,
             content,
-            metadata,
+            metadata: attach_system_metadata(user_metadata, "canonical", &canonical_hash, None),
             canonical_hash,
         });
     }
 
     let title = required_string(&value, "name")?;
-    let external_id = required_string(&value, "id")?;
-    let metadata = json!({
-        "ingest_kind": classify_standard_payload(&value)?,
-    });
+    let original_standard_id = required_string(&value, "id")?;
+    let family = classify_standard_payload(&value)?;
+    let source_domain = trusted_source_domain(&value, &original_standard_id)?;
+    let external_id =
+        canonical_external_id_for_standard(family, &source_domain, &original_standard_id);
+    let canonical_hash = normalized_json_hash(raw_body)?;
 
     Ok(CanonicalSource {
         title,
@@ -234,34 +246,65 @@ fn parse_register_payload(raw_body: &str) -> AppResult<CanonicalSource> {
         external_id,
         document_type: DocumentType::Json,
         content: raw_body.to_owned(),
-        metadata,
-        canonical_hash: normalized_json_hash(raw_body)?,
+        metadata: attach_system_metadata(
+            json!({}),
+            "direct_standard",
+            &canonical_hash,
+            Some(original_standard_id),
+        ),
+        canonical_hash,
     })
 }
 
-fn classify_standard_payload(value: &Value) -> AppResult<&'static str> {
-    let context = value.get("@context").ok_or_else(|| {
-        AppError::validation("supported-standard payload must include @context")
-    })?;
+fn classify_standard_payload(value: &Value) -> AppResult<StandardFamily> {
+    let context = value
+        .get("@context")
+        .ok_or_else(|| AppError::validation("supported-standard payload must include @context"))?;
     let kind = value
         .get("type")
         .ok_or_else(|| AppError::validation("supported-standard payload must include type"))?;
 
     let context_text = context.to_string().to_lowercase();
     let kind_text = kind.to_string().to_lowercase();
-    if context_text.contains("clr") || kind_text.contains("clr") || value.get("issuer").is_some() {
-        Ok("clr")
-    } else if context_text.contains("openbadges")
+    if context_text.contains("openbadges")
         || kind_text.contains("achievementcredential")
         || kind_text.contains("openbadge")
     {
-        Ok("open_badges")
+        Ok(StandardFamily::OpenBadges)
+    } else if context_text.contains("clr")
+        || kind_text.contains("clr")
+        || kind_text.contains("clrcredential")
+    {
+        Ok(StandardFamily::Clr)
+    } else if context_text.contains("openbadges")
+        || kind_text.contains("openbadge")
+        || kind_text.contains("achievementcredential")
+    {
+        Ok(StandardFamily::OpenBadges)
+    } else if value.get("issuer").is_some() {
+        Ok(StandardFamily::Clr)
     } else {
-        Err(AppError::validation(
-            "supported-standard payload is shape-valid but unmappable",
+        Err(
+            AppError::validation("supported-standard payload is shape-valid but unmappable")
+                .with_error_code("INVALID_STANDARD_PAYLOAD"),
         )
-        .with_error_code("INVALID_STANDARD_PAYLOAD"))
     }
+}
+
+fn trusted_source_domain(value: &Value, original_standard_id: &str) -> AppResult<String> {
+    if let Some(issuer_id) = value
+        .get("issuer")
+        .and_then(|issuer| issuer.get("id").or(Some(issuer)))
+        .and_then(Value::as_str)
+        .and_then(extract_host)
+    {
+        return Ok(issuer_id);
+    }
+
+    extract_host(original_standard_id).ok_or_else(|| {
+        AppError::validation("supported-standard payload is shape-valid but unmappable")
+            .with_error_code("INVALID_STANDARD_PAYLOAD")
+    })
 }
 
 fn required_string(value: &Value, key: &str) -> AppResult<String> {
@@ -281,6 +324,42 @@ fn optional_string(value: &Value, key: &str) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_owned)
+}
+
+fn metadata_object(value: &Value) -> AppResult<Value> {
+    match value.get("metadata") {
+        Some(Value::Object(_)) => Ok(value.get("metadata").cloned().unwrap_or_else(|| json!({}))),
+        Some(_) => Err(AppError::validation("'metadata' must be an object")),
+        None => Ok(json!({})),
+    }
+}
+
+fn attach_system_metadata(
+    metadata: Value,
+    ingest_kind: &str,
+    semantic_payload_hash: &str,
+    original_standard_id: Option<String>,
+) -> Value {
+    let mut metadata = match metadata {
+        Value::Object(map) => map,
+        _ => serde_json::Map::new(),
+    };
+
+    metadata.insert(
+        "system".to_owned(),
+        json!({
+            "canonical_id_version": CANONICAL_ID_VERSION,
+            "ingest_kind": ingest_kind,
+            "semantic_payload_hash": semantic_payload_hash,
+            "original_standard_id": original_standard_id,
+        }),
+    );
+
+    Value::Object(metadata)
+}
+
+fn extract_host(value: &str) -> Option<String> {
+    value.parse::<http::Uri>().ok()?.host().map(str::to_owned)
 }
 
 fn canonical_json_shape(value: &Value) -> String {
@@ -330,9 +409,7 @@ fn into_persisted_memory_item(item: MemoryItem) -> PersistedMemoryItemRecord {
     }
 }
 
-fn bundle_to_source_view(
-    bundle: core_infra::surrealdb::PersistedSourceBundle,
-) -> SourceView {
+fn bundle_to_source_view(bundle: core_infra::surrealdb::PersistedSourceBundle) -> SourceView {
     SourceView {
         source_id: bundle.source.source_id,
         external_id: bundle.source.external_id.clone(),

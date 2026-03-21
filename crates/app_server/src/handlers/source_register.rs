@@ -47,6 +47,7 @@ pub async fn register_source(State(state): State<AppState>, body: Bytes) -> Resp
                     "document_type": source.document_type,
                     "created_at": created_at,
                     "indexing_status": source.indexing_status,
+                    "source_metadata": source.source_metadata,
                     "memory_items": source.memory_items.iter().map(|item| {
                         json!({
                             "urn": item.urn,

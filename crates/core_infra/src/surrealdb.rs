@@ -127,7 +127,11 @@ impl InMemorySurrealDb {
             ));
         }
 
-        if let Some(existing) = state.sources_by_external_id.get(&source.external_id).cloned() {
+        if let Some(existing) = state
+            .sources_by_external_id
+            .get(&source.external_id)
+            .cloned()
+        {
             let items = Self::items_for_source(&state, existing.source_id);
             if existing.canonical_hash == source.canonical_hash {
                 return Ok(CommitRegistrationOutcome::Replay(PersistedSourceBundle {
@@ -169,7 +173,9 @@ impl InMemorySurrealDb {
             }
         }
 
-        state.sources_by_external_id.insert(external_id, source.clone());
+        state
+            .sources_by_external_id
+            .insert(external_id, source.clone());
 
         Ok(CommitRegistrationOutcome::Created(PersistedSourceBundle {
             source,
@@ -220,7 +226,9 @@ impl InMemorySurrealDb {
     ) -> AppResult<(usize, Vec<SearchProjectionRecord>)> {
         let state = self.state.lock().expect("state poisoned");
         if !state.search_available {
-            return Err(AppError::search_unavailable("search projection is unavailable"));
+            return Err(AppError::search_unavailable(
+                "search projection is unavailable",
+            ));
         }
 
         let mut items: Vec<_> = state

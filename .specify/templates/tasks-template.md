@@ -8,7 +8,7 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: The examples below include test tasks. If the constitution or user request requires TDD, tests are REQUIRED and each story must include RED and VERIFY tasks.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -24,6 +24,13 @@ description: "Task list template for feature implementation"
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
+
+## TDD Shape
+
+- `RED`: failing test or executable check tied to one or more requirements or acceptance criteria
+- `GREEN`: smallest implementation that makes the RED step pass
+- `REFACTOR`: structural cleanup, boundary extraction, or duplication removal without changing behavior
+- `VERIFY`: explicit quality gate using the repository's standard runners and slow checks
 
 <!-- 
   ============================================================================
@@ -79,14 +86,14 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
+### RED: User Story 1 ⚠️
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
 - [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
 
-### Implementation for User Story 1
+### GREEN: User Story 1
 
 - [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
 - [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
@@ -94,6 +101,14 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T015 [US1] Implement [endpoint/feature] in src/[location]/[file].py
 - [ ] T016 [US1] Add validation and error handling
 - [ ] T017 [US1] Add logging for user story 1 operations
+
+### REFACTOR: User Story 1
+
+- [ ] T018 [US1] Extract shared boundaries or remove duplication in src/[location]/[file].py
+
+### VERIFY: User Story 1
+
+- [ ] T019 [US1] Run the story quality gate with the repository standard commands
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -105,17 +120,25 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
+### RED: User Story 2 ⚠️
 
 - [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
 
-### Implementation for User Story 2
+### GREEN: User Story 2
 
 - [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
 - [ ] T021 [US2] Implement [Service] in src/services/[service].py
 - [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
 - [ ] T023 [US2] Integrate with User Story 1 components (if needed)
+
+### REFACTOR: User Story 2
+
+- [ ] T024 [US2] Extract shared boundaries or remove duplication in src/[location]/[file].py
+
+### VERIFY: User Story 2
+
+- [ ] T025 [US2] Run the story quality gate with the repository standard commands
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
@@ -127,16 +150,24 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
+### RED: User Story 3 ⚠️
 
 - [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
 
-### Implementation for User Story 3
+### GREEN: User Story 3
 
 - [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
 - [ ] T027 [US3] Implement [Service] in src/services/[service].py
 - [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+
+### REFACTOR: User Story 3
+
+- [ ] T029 [US3] Extract shared boundaries or remove duplication in src/[location]/[file].py
+
+### VERIFY: User Story 3
+
+- [ ] T030 [US3] Run the story quality gate with the repository standard commands
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -178,11 +209,11 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Within Each User Story
 
-- Tests (if included) MUST be written and FAIL before implementation
-- Models before services
+- RED tasks MUST be written and observed failing before GREEN work starts
+- Models before services when the story includes models
 - Services before endpoints
-- Core implementation before integration
-- Story complete before moving to next priority
+- REFACTOR must preserve behavior proven in RED/GREEN
+- VERIFY closes the story before moving to the next priority
 
 ### Parallel Opportunities
 
@@ -245,7 +276,7 @@ With multiple developers:
 - [P] tasks = different files, no dependencies
 - [Story] label maps task to specific user story for traceability
 - Each user story should be independently completable and testable
-- Verify tests fail before implementing
+- Verify RED fails before implementing GREEN and VERIFY passes before closing the story
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence

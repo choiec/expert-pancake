@@ -18,7 +18,9 @@ pub async fn get_source(State(state): State<AppState>, Path(source_id): Path<Uui
             "summary": source.summary,
             "document_type": source.document_type,
             "created_at": source.created_at.format(&Rfc3339).unwrap_or_else(|_| source.created_at.unix_timestamp().to_string()),
+            "updated_at": source.created_at.format(&Rfc3339).unwrap_or_else(|_| source.created_at.unix_timestamp().to_string()),
             "indexing_status": source.indexing_status,
+            "source_metadata": source.source_metadata,
             "memory_items": source.memory_items.iter().map(|item| {
                 json!({
                     "urn": item.urn,

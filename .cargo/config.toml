@@ -1,0 +1,10 @@
+[alias]
+fmt-check = "fmt --all --check"
+lint-workspace = "clippy --workspace --all-targets --all-features -- -D warnings"
+test-fast = "nextest run --workspace --lib --bins --tests"
+test-full = "nextest run --workspace --all-targets --all-features"
+test-mutants = "mutants --workspace --test-tool nextest"
+test-coverage = "llvm-cov nextest --workspace --all-features --lcov --output-path target/llvm-cov/lcov.info"
+
+[env]
+CARGO_TERM_COLOR = "always"
