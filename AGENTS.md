@@ -2,7 +2,14 @@
 
 ## Purpose
 
-This repository uses a Spec-Driven Development (SDD) workflow. AI agents working in this repo must treat specifications as the primary source of truth for implementation, rather than inferring behavior from incomplete code or ad hoc instructions.
+This repository uses a Spec-Driven Development (SDD) workflow. Codex agents working in this repo must treat specifications as the primary source of truth for implementation, rather than inferring behavior from incomplete code or ad hoc instructions.
+
+The canonical agent surface for this repository is:
+- `AGENTS.md` for repository-wide operating rules
+- `.codex/prompts/` for phase-specific Spec Kit command prompts
+- `.specify/` and `specs/` for durable workflow artifacts
+
+Only the Codex operating surface is canonical for this repository.
 
 The canonical workflow is:
 
@@ -95,7 +102,7 @@ When working on a feature, read in this order:
 
 1. `AGENTS.md`
 2. Project constitution (for example: `.specify/memory/constitution.md`)
-3. Relevant feature spec (for example: `.specify/specs/<feature>/spec.md`)
+3. Relevant feature spec (for example: `specs/<feature>/spec.md`)
 4. Clarification records, if any
 5. Plan (`plan.md`)
 6. Related research/data/contracts/quickstart artifacts
@@ -103,6 +110,23 @@ When working on a feature, read in this order:
 8. Existing code
 
 If any artifact is missing, say so explicitly and proceed only within the scope of the current command.
+
+---
+
+## Codex Command Surface
+
+Use the Codex prompt set in `.codex/prompts/` as the command reference:
+- `speckit.constitution.md`
+- `speckit.specify.md`
+- `speckit.clarify.md`
+- `speckit.plan.md`
+- `speckit.tasks.md`
+- `speckit.analyze.md`
+- `speckit.checklist.md`
+- `speckit.implement.md`
+- `speckit.taskstoissues.md`
+
+These prompts must preserve the artifact chain `constitution → spec → plan → tasks → implementation`.
 
 ---
 
@@ -215,6 +239,28 @@ When generating code:
 - keep changes scoped
 - mention any assumptions
 - include self-check notes against the governing artifacts
+
+---
+
+## Repository Conventions
+
+- Use Conventional Commits for commit messages
+- Keep agent-related automation Codex-specific unless the repository explicitly adopts another canonical surface in a future migration
+- Treat `AGENTS.md` as the single source of truth for agent operating rules
+
+<!-- BEGIN AUTO-GENERATED CODEX CONTEXT -->
+## Codex Runtime Context
+
+This section is maintained by `.specify/scripts/bash/update-agent-context.sh codex` during planning work.
+
+- Last updated: not yet generated
+- Active feature: not yet generated
+- Language/Version: not yet generated
+- Primary Dependencies: not yet generated
+- Storage: not yet generated
+- Testing: not yet generated
+- Project Type: not yet generated
+<!-- END AUTO-GENERATED CODEX CONTEXT -->
 
 ---
 
