@@ -2,6 +2,11 @@
 
 **Status**: IMPLEMENT-READY
 
+## Merge Note
+
+- The canonical source identity decisions that were tracked separately in `002-canonical-source-external-id` on `main` are treated as folded into `001-memory-ingest` in this branch.
+- Research decisions in this document should therefore be read as governing both the original ingest slice and the canonical identity update.
+
 These research decisions are ratified for implementation by `/workspaces/rust/specs/001-memory-ingest/adr/0001-direct-standard-ingest.md`.
 
 ## Implementation Readiness Note

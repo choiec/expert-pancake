@@ -2,7 +2,7 @@
 
 **Status**: IMPLEMENT-READY
 
-This directory contains the public HTTP contract for the first memory-ingest vertical slice.
+This directory contains the merged public HTTP contract for the memory-ingest slice after folding the canonical source identity rules from `002-canonical-source-external-id` into `001-memory-ingest`.
 
 ## Contract Scope
 
@@ -15,28 +15,24 @@ This directory contains the public HTTP contract for the first memory-ingest ver
 
 ## Contract Principles
 
-- Authoritative retrieval is always served from SurrealDB-backed canonical records.
-- Search is a Meilisearch projection and may be degraded independently. Search responses are projection hits, not authoritative memory-item payloads.
-- `/health` is a local-only liveness probe. `/ready` is the dependency-aware probe for SurrealDB write-path readiness and search degradation reporting.
-- Open Badges and CLR are accepted only at the ingest boundary and do not change the canonical retrieval schema. Validation uses repository-pinned JSON Schema snapshots for the supported credential envelope profiles in this slice; payloads that are shape-valid but cannot map into canonical title and external_id are rejected with HTTP 400, while accepted request bodies are preserved as authoritative canonical content exactly as submitted.
-- Accepted direct-standard ingest is surfaced through `document_type = json` plus one `json_document` memory item. No semantic splitting by credential substructure occurs in this slice.
-- Public indexing progress uses only `queued`, `indexed`, and `deferred`. Internal outbox job states remain implementation-only.
-- Error responses use one JSON envelope with stable `error_code`, `message`, `details`, `timestamp`, and `request_id` fields.
+- Authoritative source identity uses canonical project-owned `external_id` values.
+- Internal `source_id` is deterministic and distinct from `external_id`.
+- Direct-standard ingest returns canonical identity while preserving original upstream identifiers only as provenance under `source_metadata.system`.
+- Replay and conflict decisions use canonical identity plus semantic payload hash, not formatting-only raw-body differences.
+- Retrieval is authoritative; search remains a projection-only surface.
+- Public contracts do not expose migration-only aliases or compatibility fields.
 
-## Coverage Expectations
+## Public Provenance Envelope
 
-- HTTP contract tests must assert every published endpoint and every published status code, including `408` for `POST /sources/register`, `200` for `/health`, and `200/503` for `/ready`.
-- HTTP contract and integration coverage must explicitly include Open Badges success, CLR success, schema-invalid standard payload `400`, shape-valid-but-unmappable standard payload `400`, replay, and conflict behavior.
-- Storage-adapter contract tests must complement the public HTTP contract by verifying SurrealDB authoritative guarantees and Meilisearch projection guarantees required by the constitution.
-- Performance validation must use the instrumented metrics pipeline to measure p95/p99 latency and error rate against the published performance criteria.
+Registration and retrieval responses expose canonical provenance under `source_metadata.system`:
 
-## Implementation Verification Checkpoints
+- `canonical_id_version`
+- `ingest_kind`
+- `semantic_payload_hash`
+- `original_standard_id` when present
 
-- **Standard-payload validation**: the contract is satisfied only when accepted, schema-invalid, and shape-valid-but-unmappable Open Badges and CLR payloads match the documented allow or reject outcomes and rejected requests create no authoritative state.
-- **Replay hashing**: the contract is satisfied only when formatting-only variants of the same validated standard payload replay to the same authoritative identifiers while retrieval still returns the preserved first-commit content exactly as stored.
-- **Outbox mapping**: the contract is satisfied only when external `indexing_status` values (`queued`, `indexed`, `deferred`) summarize authoritative-plus-outbox state correctly and internal job statuses remain implementation-only.
-- **Performance gates**: the contract is satisfied for release only when the published latency and error-rate criteria are asserted through the documented metrics and load-validation workflow.
+Internal diagnostics such as `raw_body_hash` remain non-public.
 
 ## Contract File
 
-- `memory-ingest.openapi.yaml`: machine-readable OpenAPI 3.1 contract for the current slice.
+- `memory-ingest.openapi.yaml`: machine-readable OpenAPI 3.1 contract for the merged slice.

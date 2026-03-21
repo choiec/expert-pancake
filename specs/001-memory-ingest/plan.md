@@ -5,9 +5,14 @@
 **Input**: Feature specification from `/workspaces/rust/specs/001-memory-ingest/spec.md`
 **Related ADR**: `/workspaces/rust/specs/001-memory-ingest/adr/0001-direct-standard-ingest.md`
 
+## Merge Note
+
+- This plan now carries the canonical source identity concerns that were split into `002-canonical-source-external-id` on `main`.
+- No separate `specs/002-*` folder is created in this branch; the merged plan remains under `001-memory-ingest`.
+
 ## Technical Summary
 
-This vertical slice adds the first production-shaped ingest pipeline for canonical memory storage: Axum handlers accept canonical, Open Badges, or CLR JSON at the HTTP boundary; adapter validators translate supported payloads into a protocol-neutral canonical `Source` plus derived `MemoryItem` values; an application service normalizes content with a preserve-or-reject policy, persists authoritative state transactionally in SurrealDB, records durable indexing work, and exposes retrieval APIs from authoritative storage. Canonical `text` and `markdown` inputs preserve their submitted `content` field, while accepted Open Badges and CLR payloads become authoritative `Source` records with `document_type = json` and exactly one preserved `json_document` memory item spanning the full UTF-8 request body. Meilisearch is used only as a search projection and never as a source of truth. Future FalkorDB graph work is intentionally deferred, but this slice explicitly establishes a no-op graph projection boundary so graph indexing can be added later without changing source or retrieval contracts.
+This vertical slice adds the first production-shaped ingest pipeline for canonical memory storage and canonical source identity governance: Axum handlers accept canonical/manual, Open Badges, or CLR JSON at the HTTP boundary; adapter validators translate supported payloads into a protocol-neutral canonical `Source` plus derived `MemoryItem` values; an application service normalizes content with a preserve-or-reject policy, persists authoritative state transactionally in SurrealDB, records durable indexing work, and exposes retrieval APIs from authoritative storage. Canonical/manual requests must already carry a project-owned canonical `external_id`; direct-standard requests derive canonical `external_id`, preserve the original upstream identifier as provenance, and compute replay semantics from semantic payload equality rather than raw formatting. Meilisearch is used only as a search projection and never as a source of truth.
 
 ## Technical Context
 

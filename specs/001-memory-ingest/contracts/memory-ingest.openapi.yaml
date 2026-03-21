@@ -1,15 +1,22 @@
 openapi: 3.1.0
 info:
   title: Memory Ingest API
-  version: 0.1.0
-  summary: Implement-ready contract for the first memory-ingest vertical slice.
+  version: 0.2.0
+  summary: Memory ingest plus canonical source identity contract.
+  description: >-
+    Public contract for canonical/manual and direct-standard ingest after
+    canonical source identity governance was folded into the 001 slice.
 servers:
   - url: http://127.0.0.1:3000
 paths:
   /sources/register:
     post:
       summary: Register a source document and derive memory items.
-      description: Canonical requests are validated directly. Open Badges AchievementCredential-style and CLR credential-style requests must pass repository-pinned JSON Schema validation for the supported envelope profiles in this slice and must map deterministically into canonical title and external_id while preserving the accepted UTF-8 request body as authoritative canonical content. Accepted standard payloads are exposed as `document_type = json` with one derived `json_document` memory item.
+      description: >-
+        Canonical/manual ingest accepts only already-canonical external ids.
+        Direct-standard ingest derives canonical external ids, preserves the
+        original payload id as provenance metadata, and computes replay
+        semantics from canonical identity plus semantic payload hash.
       operationId: registerSource
       requestBody:
         required: true
@@ -34,7 +41,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RegisterSourceResponse'
         '400':
-          description: Invalid input, invalid supported-standard payload, or unsupported canonical mapping.
+          description: Invalid canonical identity input or unmappable supported-standard payload.
           content:
             application/json:
               schema:
@@ -46,7 +53,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: Duplicate external id with conflicting canonical payload.
+          description: Canonical external id already exists with a semantically different payload.
           content:
             application/json:
               schema:
@@ -125,7 +132,7 @@ paths:
   /search/memory-items:
     get:
       summary: Search memory-item projections.
-      description: Returns Meilisearch projection hits only. Authoritative content remains available through GET /memory-items/{urn} and GET /sources/{source-id}.
+      description: Returns projection hits only; authoritative retrieval remains on source and memory-item endpoints.
       operationId: searchMemoryItems
       parameters:
         - name: q
@@ -218,7 +225,7 @@ components:
           type: string
         external-id:
           type: string
-          minLength: 1
+          pattern: '^https://api\.cherry-pick\.net/[a-z0-9]+/v[0-9]+p[0-9]+(?:p[0-9]+)?/[^:]+:.+$'
         document-type:
           type: string
           enum: [text, markdown]
@@ -249,10 +256,10 @@ components:
                 type: string
         id:
           type: string
+          description: Original standard payload identifier preserved as provenance only.
         name:
           type: string
       additionalProperties: true
-      description: Boundary DTO validated against the repository-pinned Open Badges AchievementCredential envelope schema for this slice. If the payload passes envelope validation but cannot be mapped deterministically into canonical title and external_id, the request fails with 400. Successful requests are persisted with `document_type = json` and one `json_document` memory item.
     ClrRegisterRequest:
       type: object
       required:
@@ -275,22 +282,22 @@ components:
                 type: string
         id:
           type: string
+          description: Original standard payload identifier preserved as provenance only.
         name:
           type: string
         issuer:
           type: object
           additionalProperties: true
       additionalProperties: true
-      description: Boundary DTO validated against the repository-pinned CLR credential envelope schema for this slice. If the payload passes envelope validation but cannot be mapped deterministically into canonical title and external_id, the request fails with 400. Successful requests are persisted with `document_type = json` and one `json_document` memory item.
     RegisterSourceResponse:
       type: object
-      description: Successful registration or idempotent replay response. For supported direct-standard ingest, success implies the payload passed the pinned boundary schema and canonical mapping checks; replay acceptance is decided from the documented canonical payload hash semantics rather than raw-body byte equality.
       required:
         - source_id
         - external_id
         - document_type
-        - memory_items
         - indexing_status
+        - source_metadata
+        - memory_items
       properties:
         source_id:
           type: string
@@ -302,6 +309,8 @@ components:
           enum: [text, markdown, json]
         indexing_status:
           $ref: '#/components/schemas/IndexingStatus'
+        source_metadata:
+          $ref: '#/components/schemas/SourceMetadataEnvelope'
         memory_items:
           type: array
           items:
@@ -322,14 +331,12 @@ components:
           $ref: '#/components/schemas/MemoryUnitType'
     SourceResponse:
       type: object
-      description: Authoritative source retrieval response. `indexing_status` is a public summary of indexing progress derived from authoritative and outbox state; internal outbox vocabulary is not exposed.
       required:
         - source_id
         - external_id
         - title
         - document_type
-        - created_at
-        - indexing_status
+        - source_metadata
         - memory_items
       properties:
         source_id:
@@ -347,8 +354,13 @@ components:
         created_at:
           type: string
           format: date-time
+        updated_at:
+          type: string
+          format: date-time
         indexing_status:
           $ref: '#/components/schemas/IndexingStatus'
+        source_metadata:
+          $ref: '#/components/schemas/SourceMetadataEnvelope'
         memory_items:
           type: array
           items:
@@ -373,7 +385,6 @@ components:
           minimum: 0
         content:
           type: string
-          description: Authoritative stored content. For direct-standard `json_document` items, this is the preserved UTF-8 request body from the first successful registration for that `external_id`.
         item_metadata:
           type: object
           required:
@@ -387,11 +398,9 @@ components:
             start_offset:
               type: integer
               minimum: 0
-              description: Inclusive UTF-8 byte offset into authoritative canonical content.
             end_offset:
               type: integer
               minimum: 0
-              description: Exclusive UTF-8 byte offset into authoritative canonical content.
             version:
               type: string
           additionalProperties: true
@@ -406,7 +415,6 @@ components:
           additionalProperties: true
     SearchResponse:
       type: object
-      description: Search projection response from Meilisearch. Items are projection hits, not authoritative retrieval documents.
       required:
         - total
         - limit
@@ -428,7 +436,6 @@ components:
             $ref: '#/components/schemas/SearchHit'
     SearchHit:
       type: object
-      description: Search projection hit containing preview data only.
       required:
         - urn
         - source_id
@@ -452,9 +459,33 @@ components:
         score:
           type: number
           format: float
+    SourceMetadataEnvelope:
+      type: object
+      required:
+        - system
+      properties:
+        system:
+          $ref: '#/components/schemas/SourceSystemMetadata'
+      additionalProperties: true
+    SourceSystemMetadata:
+      type: object
+      required:
+        - canonical_id_version
+        - ingest_kind
+        - semantic_payload_hash
+      properties:
+        canonical_id_version:
+          type: string
+          enum: [v1]
+        ingest_kind:
+          type: string
+          enum: [canonical, direct_standard]
+        original_standard_id:
+          type: string
+        semantic_payload_hash:
+          type: string
     IndexingStatus:
       type: string
-      description: Public indexing progress vocabulary only. `queued` means authoritative persistence succeeded and durable indexing work is accepted but not yet confirmed in search, `indexed` means the projection is confirmed available, and `deferred` means authoritative persistence succeeded but search confirmation is delayed or degraded. Internal outbox job states are not exposed.
       enum: [queued, indexed, deferred]
     MemoryUnitType:
       type: string

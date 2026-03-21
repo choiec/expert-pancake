@@ -2,6 +2,11 @@
 
 **Input**: Design documents from `/specs/001-memory-ingest/`
 **Status**: IMPLEMENT-READY
+
+## Merge Note
+
+- The canonical source identity work that exists as `002-canonical-source-external-id` on `main` is considered merged into this task set for this branch.
+- Task execution in this branch should update existing `001-memory-ingest` artifacts rather than creating a separate `002` spec folder.
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/memory-ingest.openapi.yaml`, `quickstart.md`
 
 ## Task Generation Assumptions
