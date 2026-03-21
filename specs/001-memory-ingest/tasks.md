@@ -28,9 +28,9 @@ Break the schema-native redesign into executable RED -> GREEN -> REFACTOR -> VER
 
 **Purpose**: Prepare the codebase for the breaking schema-native redesign.
 
-- [ ] T001 Update route inventory and path helpers for `/credentials/*` in `crates/app_server/src/router.rs`, `crates/app_server/src/handlers/mod.rs`, and `crates/app_server/tests/memory_ingest_smoke.rs`
-- [ ] T002 [P] Remove wrapper-era API fixture assumptions from `specs/001-memory-ingest/contracts/memory-ingest.openapi.yaml` snapshots and `crates/app_server/tests/memory_ingest_smoke.rs`
-- [ ] T003 [P] Refresh shared naming in `crates/mod_memory/src/lib.rs`, `crates/mod_memory/src/application/mod.rs`, and `crates/mod_memory/src/domain/mod.rs` so the exported surface is credential-first rather than source-first
+- [x] T001 Update route inventory and path helpers for `/credentials/*` in `crates/app_server/src/router.rs`, `crates/app_server/src/handlers/mod.rs`, and `crates/app_server/tests/memory_ingest_smoke.rs`
+- [x] T002 [P] Remove wrapper-era API fixture assumptions from `specs/001-memory-ingest/contracts/memory-ingest.openapi.yaml` snapshots and `crates/app_server/tests/memory_ingest_smoke.rs`
+- [x] T003 [P] Refresh shared naming in `crates/mod_memory/src/lib.rs`, `crates/mod_memory/src/application/mod.rs`, and `crates/mod_memory/src/domain/mod.rs` so the exported surface is credential-first rather than source-first
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
@@ -38,11 +38,11 @@ Break the schema-native redesign into executable RED -> GREEN -> REFACTOR -> VER
 
 **Critical**: No user-story endpoint work should begin until this phase is complete.
 
-- [ ] T004 Define schema-native domain identifiers and aggregate types in `crates/mod_memory/src/domain/credential.rs`, `crates/mod_memory/src/domain/mod.rs`, and `crates/core_shared/src/lib.rs`
-- [ ] T005 [P] Replace wrapper-era repository interfaces with credential-first ports in `crates/mod_memory/src/infra/repo.rs`, `crates/mod_memory/src/infra/mod.rs`, and `crates/mod_memory/src/bootstrap.rs`
-- [ ] T006 [P] Replace SurrealDB authoritative record shapes and uniqueness bootstrap in `crates/core_infra/src/surrealdb.rs` and `crates/core_infra/src/lib.rs`
-- [ ] T007 [P] Realign shared error mapping for credential-first routes in `crates/core_shared/src/error.rs`, `crates/app_server/src/middleware.rs`, and `crates/app_server/src/handlers/health.rs`
-- [ ] T008 Remove wrapper-era route wiring and legacy retrieval handlers from `crates/app_server/src/handlers/source_register.rs`, `crates/app_server/src/handlers/source_get.rs`, `crates/app_server/src/handlers/memory_item_get.rs`, and `crates/app_server/src/router.rs`
+- [x] T004 Define schema-native domain identifiers and aggregate types in `crates/mod_memory/src/domain/credential.rs`, `crates/mod_memory/src/domain/mod.rs`, and `crates/core_shared/src/lib.rs`
+- [x] T005 [P] Replace wrapper-era repository interfaces with credential-first ports in `crates/mod_memory/src/infra/repo.rs`, `crates/mod_memory/src/infra/mod.rs`, and `crates/mod_memory/src/bootstrap.rs`
+- [x] T006 [P] Replace SurrealDB authoritative record shapes and uniqueness bootstrap in `crates/core_infra/src/surrealdb.rs` and `crates/core_infra/src/lib.rs`
+- [x] T007 [P] Realign shared error mapping for credential-first routes in `crates/core_shared/src/error.rs`, `crates/app_server/src/middleware.rs`, and `crates/app_server/src/handlers/health.rs`
+- [x] T008 Remove wrapper-era route wiring and legacy retrieval handlers from `crates/app_server/src/handlers/source_register.rs`, `crates/app_server/src/handlers/source_get.rs`, `crates/app_server/src/handlers/memory_item_get.rs`, and `crates/app_server/src/router.rs`
 
 **Checkpoint**: Foundation complete. Story work can now proceed against the schema-native model.
 
@@ -54,20 +54,20 @@ Break the schema-native redesign into executable RED -> GREEN -> REFACTOR -> VER
 
 ### RED: User Story 1
 
-- [ ] T009 [P] [US1] Add OpenAPI-backed contract validation for `POST /credentials/register` in `crates/app_server/tests/register_credential_contract.rs` and `crates/app_server/tests/fixtures/register_credential/*.json`
-- [ ] T010 [P] [US1] Add integration coverage for Open Badges and CLR create, replay, and conflict flows in `crates/app_server/tests/memory_ingest_smoke.rs`
-- [ ] T011 [P] [US1] Add storage-adapter contract coverage for schema-exact persistence and uniqueness in `crates/core_infra/tests/surreal_credential_store_contract.rs`
+- [x] T009 [P] [US1] Add OpenAPI-backed contract validation for `POST /credentials/register` in `crates/app_server/tests/register_credential_contract.rs` and `crates/app_server/tests/fixtures/register_credential/*.json`
+- [x] T010 [P] [US1] Add integration coverage for Open Badges and CLR create, replay, and conflict flows in `crates/app_server/tests/memory_ingest_smoke.rs`
+- [x] T011 [P] [US1] Add storage-adapter contract coverage for schema-exact persistence and uniqueness in `crates/core_infra/tests/surreal_credential_store_contract.rs`
 
 ### GREEN: User Story 1
 
-- [ ] T012 [P] [US1] Implement credential family classification and schema-exact filtering in `crates/mod_memory/src/bootstrap.rs` and `crates/mod_memory/src/domain/credential.rs`
-- [ ] T013 [US1] Implement authoritative create-or-replay-or-conflict credential writes in `crates/core_infra/src/surrealdb.rs`
-- [ ] T014 [US1] Implement `RegisterCredentialService` in `crates/mod_memory/src/bootstrap.rs`
-- [ ] T015 [US1] Implement the registration handler and request mapping in `crates/app_server/src/handlers/credential_register.rs`, `crates/app_server/src/handlers/mod.rs`, and `crates/app_server/src/router.rs`
+- [x] T012 [P] [US1] Implement credential family classification and schema-exact filtering in `crates/mod_memory/src/bootstrap.rs` and `crates/mod_memory/src/domain/credential.rs`
+- [x] T013 [US1] Implement authoritative create-or-replay-or-conflict credential writes in `crates/core_infra/src/surrealdb.rs`
+- [x] T014 [US1] Implement `RegisterCredentialService` in `crates/mod_memory/src/bootstrap.rs`
+- [x] T015 [US1] Implement the registration handler and request mapping in `crates/app_server/src/handlers/credential_register.rs`, `crates/app_server/src/handlers/mod.rs`, and `crates/app_server/src/router.rs`
 
 ### REFACTOR: User Story 1
 
-- [ ] T016 [US1] Extract shared schema-native mapping helpers in `crates/mod_memory/src/bootstrap.rs` and `crates/mod_memory/src/domain/credential.rs`
+- [x] T016 [US1] Extract shared schema-native mapping helpers in `crates/mod_memory/src/bootstrap.rs` and `crates/mod_memory/src/domain/credential.rs`
 
 ### VERIFY: User Story 1
 
@@ -81,22 +81,22 @@ Break the schema-native redesign into executable RED -> GREEN -> REFACTOR -> VER
 
 ### RED: User Story 2
 
-- [ ] T018 [P] [US2] Add OpenAPI-backed contract validation for `GET /credentials/{credential-id}` in `crates/app_server/tests/get_credential_contract.rs`
-- [ ] T019 [P] [US2] Add integration coverage for successful and missing credential retrieval in `crates/app_server/tests/memory_ingest_smoke.rs`
+- [x] T018 [P] [US2] Add OpenAPI-backed contract validation for `GET /credentials/{credential-id}` in `crates/app_server/tests/get_credential_contract.rs`
+- [x] T019 [P] [US2] Add integration coverage for successful and missing credential retrieval in `crates/app_server/tests/memory_ingest_smoke.rs`
 
 ### GREEN: User Story 2
 
-- [ ] T020 [P] [US2] Implement authoritative credential query ports in `crates/mod_memory/src/infra/repo.rs` and `crates/core_infra/src/surrealdb.rs`
-- [ ] T021 [US2] Implement `GetCredentialService` in `crates/mod_memory/src/bootstrap.rs`
-- [ ] T022 [US2] Implement the retrieval handler in `crates/app_server/src/handlers/credential_get.rs`, `crates/app_server/src/handlers/mod.rs`, and `crates/app_server/src/router.rs`
+- [x] T020 [P] [US2] Implement authoritative credential query ports in `crates/mod_memory/src/infra/repo.rs` and `crates/core_infra/src/surrealdb.rs`
+- [x] T021 [US2] Implement `GetCredentialService` in `crates/mod_memory/src/bootstrap.rs`
+- [x] T022 [US2] Implement the retrieval handler in `crates/app_server/src/handlers/credential_get.rs`, `crates/app_server/src/handlers/mod.rs`, and `crates/app_server/src/router.rs`
 
 ### REFACTOR: User Story 2
 
-- [ ] T023 [US2] Remove leftover source or memory-item response mappers from `crates/mod_memory/src/bootstrap.rs` and `crates/app_server/src/handlers/`
+- [x] T023 [US2] Remove leftover source or memory-item response mappers from `crates/mod_memory/src/bootstrap.rs` and `crates/app_server/src/handlers/`
 
 ### VERIFY: User Story 2
 
-- [ ] T024 [US2] Run the US2 verification gate with `cargo nextest run -p app_server --test memory_ingest_smoke` and `cargo nextest run -p app_server --test get_credential_contract`
+- [x] T024 [US2] Run the US2 verification gate with `cargo nextest run -p app_server --test memory_ingest_smoke` and `cargo nextest run -p app_server --test get_credential_contract`
 
 ## Phase 5: User Story 3 - Search credential projections (Priority: P2)
 
@@ -106,23 +106,23 @@ Break the schema-native redesign into executable RED -> GREEN -> REFACTOR -> VER
 
 ### RED: User Story 3
 
-- [ ] T025 [P] [US3] Add OpenAPI-backed contract validation for `GET /credentials/search` in `crates/app_server/tests/search_credentials_contract.rs`
-- [ ] T026 [P] [US3] Add integration coverage for projection hits and degraded-search behavior in `crates/app_server/tests/memory_ingest_smoke.rs`
-- [ ] T027 [P] [US3] Add outbox-to-projection contract coverage in `crates/core_infra/tests/credential_projection_contract.rs`
+- [x] T025 [P] [US3] Add OpenAPI-backed contract validation for `GET /credentials/search` in `crates/app_server/tests/search_credentials_contract.rs`
+- [x] T026 [P] [US3] Add integration coverage for projection hits and degraded-search behavior in `crates/app_server/tests/memory_ingest_smoke.rs`
+- [x] T027 [P] [US3] Add outbox-to-projection contract coverage in `crates/core_infra/tests/credential_projection_contract.rs`
 
 ### GREEN: User Story 3
 
-- [ ] T028 [P] [US3] Implement projection document builders in `crates/mod_memory/src/domain/credential.rs` and `crates/core_infra/src/meilisearch.rs`
-- [ ] T029 [US3] Implement durable outbox persistence and projection rehydration in `crates/core_infra/src/surrealdb.rs` and `crates/mod_memory/src/bootstrap.rs`
-- [ ] T030 [US3] Implement `SearchCredentialsService` and the search handler in `crates/mod_memory/src/bootstrap.rs`, `crates/app_server/src/handlers/credential_search.rs`, and `crates/app_server/src/router.rs`
+- [x] T028 [P] [US3] Implement projection document builders in `crates/mod_memory/src/domain/credential.rs` and `crates/core_infra/src/meilisearch.rs`
+- [x] T029 [US3] Implement durable outbox persistence and projection rehydration in `crates/core_infra/src/surrealdb.rs` and `crates/mod_memory/src/bootstrap.rs`
+- [x] T030 [US3] Implement `SearchCredentialsService` and the search handler in `crates/mod_memory/src/bootstrap.rs`, `crates/app_server/src/handlers/credential_search.rs`, and `crates/app_server/src/router.rs`
 
 ### REFACTOR: User Story 3
 
-- [ ] T031 [US3] Extract shared projection mapping helpers in `crates/mod_memory/src/bootstrap.rs` and `crates/core_infra/src/meilisearch.rs`
+- [x] T031 [US3] Extract shared projection mapping helpers in `crates/mod_memory/src/bootstrap.rs` and `crates/core_infra/src/meilisearch.rs`
 
 ### VERIFY: User Story 3
 
-- [ ] T032 [US3] Run the US3 verification gate with `cargo nextest run -p app_server --test search_credentials_contract` and `cargo nextest run -p app_server --test memory_ingest_smoke`
+- [x] T032 [US3] Run the US3 verification gate with `cargo nextest run -p app_server --test search_credentials_contract` and `cargo nextest run -p app_server --test memory_ingest_smoke`
 
 ## Phase 6: User Story 4 - Operational probes stay aligned (Priority: P2)
 
@@ -132,25 +132,25 @@ Break the schema-native redesign into executable RED -> GREEN -> REFACTOR -> VER
 
 ### RED: User Story 4
 
-- [ ] T033 [P] [US4] Add OpenAPI-backed contract validation for `/health` and `/ready` in `crates/app_server/tests/health_readiness_contract.rs`
+- [x] T033 [P] [US4] Add OpenAPI-backed contract validation for `/health` and `/ready` in `crates/app_server/tests/health_readiness_contract.rs`
 
 ### GREEN: User Story 4
 
-- [ ] T034 [US4] Update readiness and liveness payload mapping in `crates/app_server/src/handlers/health.rs`, `crates/app_server/src/state.rs`, and `crates/core_infra/src/setup.rs`
+- [x] T034 [US4] Update readiness and liveness payload mapping in `crates/app_server/src/handlers/health.rs`, `crates/app_server/src/state.rs`, and `crates/core_infra/src/setup.rs`
 
 ### REFACTOR: User Story 4
 
-- [ ] T035 [US4] Remove wrapper-era wording from probe diagnostics in `crates/app_server/src/handlers/health.rs` and `crates/core_infra/src/setup.rs`
+- [x] T035 [US4] Remove wrapper-era wording from probe diagnostics in `crates/app_server/src/handlers/health.rs` and `crates/core_infra/src/setup.rs`
 
 ### VERIFY: User Story 4
 
-- [ ] T036 [US4] Run the US4 verification gate with `cargo nextest run -p app_server --test health_readiness_contract`
+- [x] T036 [US4] Run the US4 verification gate with `cargo nextest run -p app_server --test health_readiness_contract`
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 **Purpose**: Close the redesign with consistency, documentation, and broader verification.
 
-- [ ] T037 [P] Remove wrapper-era dead code and exports in `crates/mod_memory/src/`, `crates/core_shared/src/`, and `crates/app_server/src/handlers/`
+- [x] T037 [P] Remove wrapper-era dead code and exports in `crates/mod_memory/src/`, `crates/core_shared/src/`, and `crates/app_server/src/handlers/`
 - [ ] T038 [P] Refresh smoke fixtures and quickstart-aligned examples in `crates/app_server/tests/memory_ingest_smoke.rs` and `specs/001-memory-ingest/quickstart.md`
 - [ ] T039 Run the full redesign verification gate with `cargo nextest run --workspace`, `cargo mutants -p mod_memory --test-tool nextest`, and `cargo llvm-cov nextest --workspace --lcov --output-path target/llvm-cov/001-memory-ingest.info`
 

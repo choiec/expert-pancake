@@ -1,0 +1,15 @@
+[package]
+name = "mod_memory"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+core_shared = { path = "../core_shared" }
+jsonschema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+time.workspace = true
+tracing.workspace = true
+uuid.workspace = true

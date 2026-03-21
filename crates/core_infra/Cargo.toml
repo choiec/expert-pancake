@@ -1,0 +1,14 @@
+[package]
+name = "core_infra"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+core_shared = { path = "../core_shared" }
+http.workspace = true
+mod_memory = { path = "../mod_memory" }
+serde_json.workspace = true
+time.workspace = true
+tokio.workspace = true
+uuid.workspace = true

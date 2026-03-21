@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json"
+  ],
+  "type": [
+    "VerifiableCredential",
+    "OpenBadgeCredential"
+  ],
+  "id": "urn:example:badge:001",
+  "name": "Rust Badge",
+  "issuer": {
+    "id": "https://issuer.example.org",
+    "type": "Profile",
+    "name": "Rust Academy"
+  },
+  "credentialSubject": {
+    "id": "did:example:learner:001",
+    "type": "AchievementSubject",
+    "achievement": {
+      "id": "https://issuer.example.org/achievements/rust-badge",
+      "type": "Achievement",
+      "name": "Rust Badge"
+    }
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-rdfc-2022",
+    "created": "2026-01-01T00:00:00Z",
+    "verificationMethod": "https://issuer.example.org/keys/1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3v8example"
+  },
+  "validFrom": "2026-01-01T00:00:00Z"
+}
