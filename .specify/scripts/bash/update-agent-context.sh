@@ -279,6 +279,23 @@ get_language_conventions() {
     echo "$lang: Follow standard conventions"
 }
 
+get_copilot_instruction_description() {
+    echo "Use when working in this repository. Covers the active stack, project structure, validation commands, and coding conventions."
+}
+
+get_copilot_instruction_apply_to() {
+    local lang="$1"
+
+    case "$lang" in
+        *"Rust"*)
+            echo "Cargo.toml, crates/**/Cargo.toml, crates/**/*.rs, repo_tests/**/*.rs, tests/**/*.rs"
+            ;;
+        *)
+            echo ""
+            ;;
+    esac
+}
+
 create_new_agent_file() {
     local target_file="$1"
     local temp_file="$2"
@@ -368,9 +385,17 @@ create_new_agent_file() {
 
     # Prepend Copilot instruction frontmatter for .instructions.md files.
     if [[ "$target_file" == *.instructions.md ]]; then
+        local instruction_description
+        instruction_description=$(get_copilot_instruction_description)
+        local instruction_apply_to
+        instruction_apply_to=$(get_copilot_instruction_apply_to "$NEW_LANG")
         local frontmatter_file
         frontmatter_file=$(mktemp) || return 1
-        printf '%s\n' "---" "description: Use when working in this repository. Covers the active stack, project structure, validation commands, and coding conventions." "---" "" > "$frontmatter_file"
+        if [[ -n "$instruction_apply_to" ]]; then
+            printf '%s\n' "---" "description: \"$instruction_description\"" "applyTo: \"$instruction_apply_to\"" "---" "" > "$frontmatter_file"
+        else
+            printf '%s\n' "---" "description: \"$instruction_description\"" "---" "" > "$frontmatter_file"
+        fi
         cat "$temp_file" >> "$frontmatter_file"
         mv "$frontmatter_file" "$temp_file"
     # Prepend Cursor frontmatter for .mdc files so rules are auto-included
@@ -522,9 +547,17 @@ update_existing_agent_file() {
     # Ensure Copilot .instructions.md files have YAML frontmatter for discovery.
     if [[ "$target_file" == *.instructions.md ]]; then
         if ! head -1 "$temp_file" | grep -q '^---'; then
+            local instruction_description
+            instruction_description=$(get_copilot_instruction_description)
+            local instruction_apply_to
+            instruction_apply_to=$(get_copilot_instruction_apply_to "$NEW_LANG")
             local frontmatter_file
             frontmatter_file=$(mktemp) || { rm -f "$temp_file"; return 1; }
-            printf '%s\n' "---" "description: Use when working in this repository. Covers the active stack, project structure, validation commands, and coding conventions." "---" "" > "$frontmatter_file"
+            if [[ -n "$instruction_apply_to" ]]; then
+                printf '%s\n' "---" "description: \"$instruction_description\"" "applyTo: \"$instruction_apply_to\"" "---" "" > "$frontmatter_file"
+            else
+                printf '%s\n' "---" "description: \"$instruction_description\"" "---" "" > "$frontmatter_file"
+            fi
             cat "$temp_file" >> "$frontmatter_file"
             mv "$frontmatter_file" "$temp_file"
         fi
