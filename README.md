@@ -1,12 +1,12 @@
 # expert-pancake
 
-This repository is canonically operated as `Spec Kit + Codex`.
+This repository is canonically operated as `Spec Kit + Copilot`.
 
 ## Start Here
 
 1. Read `AGENTS.md`
 2. Read `.specify/memory/constitution.md`
-3. Use the phase prompts in `.codex/prompts/`
+3. Use the phase prompts in `.github/prompts/`
 4. Treat `specs/` as the durable feature artifact chain
 
 ## Workflow
@@ -27,13 +27,13 @@ Do not skip ahead unless the required upstream artifacts already exist and are c
 ## Canonical Paths
 
 - `AGENTS.md`: repository-wide agent operating rules
-- `.codex/prompts/`: Codex command references for each workflow phase
+- `.github/prompts/`: Copilot command references for each workflow phase
 - `.specify/`: templates, memory, and workflow scripts
 - `specs/`: feature specs, plans, tasks, and supporting artifacts
 
 ## Repository Conventions
 
-- Only the Codex operating surface is canonical
+- Only the Copilot operating surface is canonical
 - Conventional Commits are the expected commit message format
 
 ## Spec-To-Test Loop

@@ -2,14 +2,14 @@
 
 ## Purpose
 
-This repository uses a Spec-Driven Development (SDD) workflow. Codex agents working in this repo must treat specifications as the primary source of truth for implementation, rather than inferring behavior from incomplete code or ad hoc instructions.
+This repository uses a Spec-Driven Development (SDD) workflow. Copilot agents working in this repo must treat specifications as the primary source of truth for implementation, rather than inferring behavior from incomplete code or ad hoc instructions.
 
 The canonical agent surface for this repository is:
 - `AGENTS.md` for repository-wide operating rules
-- `.codex/prompts/` for phase-specific Spec Kit command prompts
+- `.github/prompts/` for phase-specific Spec Kit command prompts
 - `.specify/` and `specs/` for durable workflow artifacts
 
-Only the Codex operating surface is canonical for this repository.
+Only the Copilot operating surface is canonical for this repository.
 
 The canonical workflow is:
 
@@ -113,9 +113,9 @@ If any artifact is missing, say so explicitly and proceed only within the scope 
 
 ---
 
-## Codex Command Surface
+## Copilot Command Surface
 
-Use the Codex prompt set in `.codex/prompts/` as the command reference:
+Use the Copilot prompt set in `.github/prompts/` as the command reference:
 - `speckit.constitution.md`
 - `speckit.specify.md`
 - `speckit.clarify.md`
@@ -245,13 +245,13 @@ When generating code:
 ## Repository Conventions
 
 - Use Conventional Commits for commit messages
-- Keep agent-related automation Codex-specific unless the repository explicitly adopts another canonical surface in a future migration
+- Keep agent-related automation Copilot-specific unless the repository explicitly adopts another canonical surface in a future migration
 - Treat `AGENTS.md` as the single source of truth for agent operating rules
 
-<!-- BEGIN AUTO-GENERATED CODEX CONTEXT -->
-## Codex Runtime Context
+<!-- BEGIN AUTO-GENERATED COPILOT CONTEXT -->
+## Copilot Runtime Context
 
-This section is maintained by `.specify/scripts/bash/update-agent-context.sh codex` during planning work.
+This section is maintained by `.specify/scripts/bash/update-agent-context.sh copilot` during planning work.
 
 - Last updated: 2026-03-21
 - Active feature: 001-memory-ingest
@@ -260,7 +260,7 @@ This section is maintained by `.specify/scripts/bash/update-agent-context.sh cod
 - Storage: SurrealDB for authoritative credential persistence plus durable indexing outbox; Meilisearch for search projection only
 - Testing: `cargo nextest`, contract tests, integration tests, adapter contract tests, `cargo-llvm-cov`, `cargo-mutants`
 - Project Type: Multi-crate Rust web service
-<!-- END AUTO-GENERATED CODEX CONTEXT -->
+<!-- END AUTO-GENERATED COPILOT CONTEXT -->
 
 ---
 
