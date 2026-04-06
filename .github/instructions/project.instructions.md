@@ -1,11 +1,6 @@
 ---
 description: "Use when working in this Rust workspace, especially for Cargo manifests, crate code, integration tests, or repository workflow changes. Covers architecture boundaries, validation commands, and delivery conventions."
-applyTo:
-  - Cargo.toml
-  - crates/**/Cargo.toml
-  - crates/**/*.rs
-  - repo_tests/**/*.rs
-  - tests/**/*.rs
+applyTo: "Cargo.toml, crates/**/Cargo.toml, crates/**/*.rs, repo_tests/**/*.rs, tests/**/*.rs"
 ---
 
 # Project Instructions
