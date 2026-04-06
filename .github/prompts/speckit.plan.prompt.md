@@ -1,4 +1,5 @@
 ---
+description: "Generate a technical implementation plan from an approved feature specification."
 agent: speckit.plan
 ---
 # /speckit.plan

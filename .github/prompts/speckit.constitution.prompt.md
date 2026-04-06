@@ -1,4 +1,5 @@
 ---
+description: "Create or amend the project constitution and propagate rule changes to dependent artifacts."
 agent: speckit.constitution
 ---
 # /speckit.constitution

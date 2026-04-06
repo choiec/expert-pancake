@@ -1,4 +1,5 @@
 ---
+description: "Create or refine a feature specification from a high-level request."
 agent: speckit.specify
 ---
 # /speckit.specify

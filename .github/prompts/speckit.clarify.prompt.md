@@ -1,4 +1,5 @@
 ---
+description: "Ask targeted clarification questions for the active feature spec and record the answers back into it."
 agent: speckit.clarify
 ---
 # /speckit.clarify

@@ -75,14 +75,6 @@
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
 
-### Identity & Canonicalization Constraints *(mandatory when identifiers are affected)*
-
-- Define whether the feature uses internal identifiers, canonical external identifiers, derived resource URNs, or a combination of them.
-- If canonical external identifiers are introduced or changed, specify the project-owned namespace, normalization rules, and the versioned `canonical_id_version` policy.
-- If third-party or standard payload IDs are accepted, specify how original IDs are preserved separately from canonical system identifiers.
-- Specify replay/conflict/idempotency behavior for formatting-only changes, semantic payload changes, and invalid identifier inputs.
-- State any prohibited normalization behavior, including destructive character stripping or silent identity collapse.
-
 ## Requirements *(mandatory)*
 
 <!--
@@ -97,7 +89,6 @@
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
-- If identifier grammar or replay semantics are part of the feature, add explicit requirements for contract alignment, test coverage, and documentation updates.
 
 *Example of marking unclear requirements:*
 

@@ -1,4 +1,5 @@
 ---
+description: "Convert an approved task list into issue-ready work items for project tracking."
 agent: speckit.taskstoissues
 ---
 # /speckit.taskstoissues

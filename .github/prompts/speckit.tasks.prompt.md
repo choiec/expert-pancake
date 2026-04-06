@@ -1,4 +1,5 @@
 ---
+description: "Generate an actionable, dependency-ordered task list from the approved design artifacts."
 agent: speckit.tasks
 ---
 # /speckit.tasks

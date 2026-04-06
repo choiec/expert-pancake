@@ -1,4 +1,5 @@
 ---
+description: "Validate an artifact or workflow stage against an explicit checklist."
 agent: speckit.checklist
 ---
 # /speckit.checklist

@@ -1,4 +1,5 @@
 ---
+description: "Analyze spec, plan, tasks, or implementation artifacts for consistency, risk, and readiness."
 agent: speckit.analyze
 ---
 # /speckit.analyze

@@ -1,4 +1,5 @@
 ---
+description: "Implement approved Speckit tasks while preserving the active spec, plan, and architecture boundaries."
 agent: speckit.implement
 ---
 # /speckit.implement
