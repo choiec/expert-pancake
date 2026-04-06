@@ -1,18 +1,22 @@
-use axum::{Router, extract::DefaultBodyLimit, middleware};
+use axum::Router;
+use axum::extract::DefaultBodyLimit;
+use axum::middleware;
+use axum::routing::{get, post};
+use tower_http::trace::TraceLayer;
 
-use crate::{handlers, middleware as app_middleware, state::AppState};
+use crate::handlers::{credential_get, credential_register, credential_search, health, ready};
+use crate::middleware::request_id;
+use crate::state::AppState;
 
-/// Central router composition point.
-///
-/// Future US1-US4 route modules must be merged here so request-id, trace-context,
-/// error mapping, and latency metrics stay applied automatically across the app.
 pub fn build_router(state: AppState) -> Router {
-    handlers::routes()
-        .with_state(state.clone())
-        .layer(DefaultBodyLimit::max(state.max_request_body_bytes()))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            app_middleware::latency_metrics,
-        ))
-        .layer(middleware::from_fn(app_middleware::request_context))
+    Router::new()
+        .route("/credentials/register", post(credential_register))
+        .route("/credentials/{credential_id}", get(credential_get))
+        .route("/credentials/search", get(credential_search))
+        .route("/health", get(health))
+        .route("/ready", get(ready))
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
+        .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(request_id))
+        .with_state(state)
 }

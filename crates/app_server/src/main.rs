@@ -1,43 +1,30 @@
-use app_server::{build_app, config::AppConfig};
-use core_shared::StartupError;
-use tokio::net::TcpListener;
-use tracing_subscriber::{EnvFilter, fmt};
+use std::net::SocketAddr;
+
+use app_server::{AppState, build_router};
+use core_infra::build_infra_bundle;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
-async fn main() -> Result<(), StartupError> {
-    init_tracing();
-
-    let config = AppConfig::from_env()?;
-    let listen_addr = config.http.listen_addr;
-    let (router, _) = build_app(config).await?;
-
-    let listener =
-        TcpListener::bind(listen_addr)
-            .await
-            .map_err(|error| StartupError::ServerBind {
-                address: listen_addr.to_string(),
-                reason: error.to_string(),
-            })?;
-
-    axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .map_err(|error| StartupError::ServerStart {
-            reason: error.to_string(),
-        })
-}
-
-fn init_tracing() {
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,hyper=warn,tower_http=warn"));
-
-    let _ = fmt()
-        .with_env_filter(env_filter)
-        .with_target(false)
+async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .json()
-        .try_init();
-}
+        .init();
 
-async fn shutdown_signal() {
-    let _ = tokio::signal::ctrl_c().await;
+    let listen_addr = std::env::var("APP_LISTEN_ADDR")
+        .unwrap_or_else(|_| "127.0.0.1:3000".to_string())
+        .parse::<SocketAddr>()
+        .expect("APP_LISTEN_ADDR must be a valid socket address");
+
+    let bundle = build_infra_bundle();
+    let state = AppState::new(bundle.module);
+    let listener = tokio::net::TcpListener::bind(listen_addr)
+        .await
+        .expect("listener binds");
+
+    axum::serve(listener, build_router(state))
+        .await
+        .expect("server runs");
 }

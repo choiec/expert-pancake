@@ -1,1 +1,0 @@
-{"id":"https://clr.example/credentials/123","type":["VerifiableCredential","OpenBadgeCredential"],"name":"Rust CLR","issuer":{"id":"https://issuer.example.org"},"credentialSubject":{"id":"did:example:alice","achievement":{"id":"https://skills.example/rust","name":"Rust Systems"}},"evidence":[{"type":"url","id":"https://evidence.example.org/1"}]}

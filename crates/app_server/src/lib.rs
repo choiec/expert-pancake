@@ -1,22 +1,7 @@
-pub mod config;
 pub mod handlers;
 pub mod middleware;
 pub mod router;
 pub mod state;
 
-use axum::Router;
-use core_shared::StartupError;
-
-use crate::{config::AppConfig, state::AppState};
-
-/// Shared bootstrap extension point for later story work.
-///
-/// Add new repositories, workers, and route modules here so `main.rs` remains a
-/// thin process wrapper and all HTTP routes inherit the common router middleware.
-pub async fn build_app(config: AppConfig) -> Result<(Router, AppState), StartupError> {
-    let state = AppState::bootstrap(config).await?;
-    state.spawn_background_tasks();
-    let router = router::build_router(state.clone());
-
-    Ok((router, state))
-}
+pub use router::build_router;
+pub use state::{AppState, HealthResponse, ReadinessResponse};

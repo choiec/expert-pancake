@@ -1,63 +1,46 @@
 use async_trait::async_trait;
-use time::OffsetDateTime;
+use core_shared::ApiError;
 use uuid::Uuid;
 
-use core_shared::{AppResult, MemoryItemUrn};
+use crate::domain::credential::{
+    CredentialIndexJob, CredentialSearchProjection, CredentialSearchResponse, RegistrationStatus,
+    SearchCredentialsQuery, StandardCredential,
+};
 
-use crate::domain::memory_item::MemoryItem;
-use crate::domain::source::{NewSource, Source};
-use crate::infra::indexer::{IndexingJob, ProjectionInput, PublicIndexingStatus};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceBundle {
-    pub source: Source,
-    pub memory_items: Vec<MemoryItem>,
-    pub indexing_status: PublicIndexingStatus,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MemoryItemWithSource {
-    pub source: Source,
-    pub memory_item: MemoryItem,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SourceCreateOrReplay {
-    Create(NewSource),
-    Replay(SourceBundle),
+#[derive(Debug, Clone)]
+pub struct CredentialRepositoryResult {
+    pub status: RegistrationStatus,
+    pub credential: StandardCredential,
 }
 
 #[async_trait]
-pub trait SourceRepository: Send + Sync {
-    async fn prepare_create_or_replay(&self, source: NewSource) -> AppResult<SourceCreateOrReplay>;
-}
-
-#[async_trait]
-pub trait MemoryRepository: Send + Sync {
-    async fn commit_registration(
+pub trait CredentialRepository: Send + Sync {
+    async fn register(
         &self,
-        source: NewSource,
-        memory_items: Vec<MemoryItem>,
-        job: IndexingJob,
-    ) -> AppResult<SourceBundle>;
+        credential: StandardCredential,
+    ) -> Result<CredentialRepositoryResult, ApiError>;
+
+    async fn get(&self, credential_id: &str) -> Result<Option<StandardCredential>, ApiError>;
+
+    async fn pending_jobs(&self) -> Result<Vec<CredentialIndexJob>, ApiError>;
+
+    async fn load_for_projection(
+        &self,
+        credential_id: &str,
+    ) -> Result<Option<StandardCredential>, ApiError>;
+
+    async fn mark_job_completed(&self, job_id: Uuid) -> Result<(), ApiError>;
 }
 
 #[async_trait]
-pub trait MemoryQueryRepository: Send + Sync {
-    async fn get_memory_item(&self, urn: &MemoryItemUrn) -> AppResult<MemoryItemWithSource>;
+pub trait ProjectionRepository: Send + Sync {
+    async fn upsert(&self, projection: CredentialSearchProjection) -> Result<(), ApiError>;
 }
 
 #[async_trait]
-pub trait SourceQueryRepository: Send + Sync {
-    async fn get_source(&self, source_id: Uuid) -> AppResult<SourceBundle>;
-}
-
-#[async_trait]
-pub trait IndexingOutboxRepository: Send + Sync {
-    async fn claim_next_job(&self, now: OffsetDateTime) -> AppResult<Option<IndexingJob>>;
-
-    async fn rehydrate_projection_inputs(&self, source_id: Uuid)
-    -> AppResult<Vec<ProjectionInput>>;
-
-    async fn update_job(&self, job: &IndexingJob) -> AppResult<()>;
+pub trait SearchRepository: Send + Sync {
+    async fn search(
+        &self,
+        query: &SearchCredentialsQuery,
+    ) -> Result<CredentialSearchResponse, ApiError>;
 }

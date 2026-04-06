@@ -1,89 +1,77 @@
-use serde::{Deserialize, Serialize};
+use http::StatusCode;
+use serde::Serialize;
 use serde_json::Value;
-use thiserror::Error;
+use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
-pub type CoreResult<T> = Result<T, AppError>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ErrorKind {
-    Validation,
-    PayloadTooLarge,
-    Conflict,
-    Timeout,
-    NotFound,
-    StorageUnavailable,
-    SearchDegraded,
-    Startup,
-    Internal,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AppError {
-    kind: ErrorKind,
+#[derive(Debug, Clone)]
+pub struct ApiError {
+    status: StatusCode,
+    error_code: &'static str,
     message: String,
     details: Option<Value>,
-    error_code_override: Option<String>,
 }
 
-impl AppError {
-    pub fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
+impl ApiError {
+    pub fn new(
+        status: StatusCode,
+        error_code: &'static str,
+        message: impl Into<String>,
+        details: Option<Value>,
+    ) -> Self {
         Self {
-            kind,
+            status,
+            error_code,
             message: message.into(),
-            details: None,
-            error_code_override: None,
+            details,
         }
     }
 
-    pub fn with_details(mut self, details: Value) -> Self {
-        self.details = Some(details);
-        self
+    pub fn invalid_input(message: impl Into<String>, details: Option<Value>) -> Self {
+        Self::new(StatusCode::BAD_REQUEST, "INVALID_INPUT", message, details)
     }
 
-    pub fn with_error_code(mut self, error_code: impl Into<String>) -> Self {
-        self.error_code_override = Some(error_code.into());
-        self
-    }
-
-    pub fn validation(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::Validation, message)
-    }
-
-    pub fn payload_too_large(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::PayloadTooLarge, message)
-    }
-
-    pub fn conflict(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::Conflict, message)
-    }
-
-    pub fn timeout(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::Timeout, message)
+    pub fn conflict(message: impl Into<String>, details: Option<Value>) -> Self {
+        Self::new(StatusCode::CONFLICT, "CONFLICT", message, details)
     }
 
     pub fn not_found(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::NotFound, message)
+        Self::new(StatusCode::NOT_FOUND, "NOT_FOUND", message, None)
     }
 
-    pub fn storage_unavailable(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::StorageUnavailable, message)
+    pub fn payload_too_large(message: impl Into<String>) -> Self {
+        Self::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "PAYLOAD_TOO_LARGE",
+            message,
+            None,
+        )
     }
 
-    pub fn search_degraded(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::SearchDegraded, message)
+    pub fn timeout(message: impl Into<String>) -> Self {
+        Self::new(
+            StatusCode::REQUEST_TIMEOUT,
+            "VALIDATION_TIMEOUT",
+            message,
+            None,
+        )
     }
 
-    pub fn internal(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::Internal, message)
+    pub fn service_unavailable(message: impl Into<String>) -> Self {
+        Self::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "SERVICE_UNAVAILABLE",
+            message,
+            None,
+        )
     }
 
-    pub fn startup(error: StartupError) -> Self {
-        Self::new(ErrorKind::Startup, error.to_string()).with_details(error.details())
+    pub fn status(&self) -> StatusCode {
+        self.status
     }
 
-    pub fn kind(&self) -> ErrorKind {
-        self.kind
+    pub fn error_code(&self) -> &'static str {
+        self.error_code
     }
 
     pub fn message(&self) -> &str {
@@ -93,72 +81,28 @@ impl AppError {
     pub fn details(&self) -> Option<&Value> {
         self.details.as_ref()
     }
-
-    pub fn error_code(&self) -> &str {
-        if let Some(error_code) = self.error_code_override.as_deref() {
-            return error_code;
-        }
-
-        match self.kind {
-            ErrorKind::Validation => "INVALID_INPUT",
-            ErrorKind::PayloadTooLarge => "PAYLOAD_TOO_LARGE",
-            ErrorKind::Conflict => "EXTERNAL_ID_CONFLICT",
-            ErrorKind::Timeout => "NORMALIZATION_TIMEOUT",
-            ErrorKind::NotFound => "NOT_FOUND",
-            ErrorKind::StorageUnavailable => "STORAGE_UNAVAILABLE",
-            ErrorKind::SearchDegraded => "SEARCH_UNAVAILABLE",
-            ErrorKind::Startup => "STARTUP_FAILURE",
-            ErrorKind::Internal => "INTERNAL_ERROR",
-        }
-    }
 }
 
-#[derive(Debug, Clone, Error, PartialEq, Eq, Serialize, Deserialize)]
-pub enum StartupError {
-    #[error("missing required environment variable {key}")]
-    MissingEnv { key: String },
-    #[error("invalid environment variable {key}: {reason}")]
-    InvalidEnv {
-        key: String,
-        value: String,
-        reason: String,
-    },
-    #[error("failed to bootstrap {component}: {reason}")]
-    InfraBootstrap { component: String, reason: String },
-    #[error("failed to bind HTTP listener on {address}: {reason}")]
-    ServerBind { address: String, reason: String },
-    #[error("failed to start HTTP server: {reason}")]
-    ServerStart { reason: String },
+#[derive(Debug, Clone, Serialize)]
+pub struct ErrorBody {
+    pub error_code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<Value>,
+    pub timestamp: String,
+    pub request_id: String,
 }
 
-impl StartupError {
-    pub fn details(&self) -> Value {
-        match self {
-            StartupError::MissingEnv { key } => {
-                serde_json::json!({ "key": key })
-            }
-            StartupError::InvalidEnv { key, value, reason } => serde_json::json!({
-                "key": key,
-                "value": value,
-                "reason": reason,
-            }),
-            StartupError::InfraBootstrap { component, reason } => serde_json::json!({
-                "component": component,
-                "reason": reason,
-            }),
-            StartupError::ServerBind { address, reason } => serde_json::json!({
-                "address": address,
-                "reason": reason,
-            }),
-            StartupError::ServerStart { reason } => serde_json::json!({
-                "reason": reason,
-            }),
-        }
-    }
-}
+pub fn error_body(error: &ApiError, request_id: &str) -> ErrorBody {
+    let timestamp = OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_string());
 
-impl From<StartupError> for AppError {
-    fn from(value: StartupError) -> Self {
-        Self::startup(value)
+    ErrorBody {
+        error_code: error.error_code().to_string(),
+        message: error.message().to_string(),
+        details: error.details().cloned(),
+        timestamp,
+        request_id: request_id.to_string(),
     }
 }

@@ -1,10 +1,5 @@
 pub mod error;
-pub mod id_gen;
-pub mod urn;
+pub mod id;
 
-pub use error::{AppError, CoreResult, ErrorKind, StartupError};
-pub use id_gen::{DefaultIdGenerator, IdGenerator};
-pub use urn::MemoryItemUrn;
-
-pub type AppResult<T> = CoreResult<T>;
-pub type ErrorCode = ErrorKind;
+pub use error::{ApiError, ErrorBody, error_body};
+pub use id::{decode_credential_id, encode_credential_id};

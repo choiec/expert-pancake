@@ -1,15 +1,14 @@
 [package]
 name = "core_infra"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
+async-trait.workspace = true
 core_shared = { path = "../core_shared" }
-meilisearch-sdk = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-surrealdb = { workspace = true }
-time = { version = "0.3.44", features = ["serde"] }
-tokio = { workspace = true }
-tracing = { workspace = true }
-uuid = { workspace = true }
+http.workspace = true
+mod_memory = { path = "../mod_memory" }
+serde_json.workspace = true
+time.workspace = true
+tokio.workspace = true
+uuid.workspace = true

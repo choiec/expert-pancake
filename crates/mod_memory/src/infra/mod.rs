@@ -1,8 +1,5 @@
-pub mod graph;
-pub mod indexer;
-pub mod meili_indexer;
 pub mod repo;
-pub mod surreal_memory_query;
-pub mod surreal_memory_repo;
-pub mod surreal_source_query;
-pub mod surreal_source_repo;
+
+pub use repo::{
+    CredentialRepository, CredentialRepositoryResult, ProjectionRepository, SearchRepository,
+};

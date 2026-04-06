@@ -1,160 +1,131 @@
-use meilisearch_sdk::client::Client;
-use meilisearch_sdk::errors::Error as MeilisearchError;
-use meilisearch_sdk::search::SearchResults;
-use meilisearch_sdk::settings::Settings;
-use serde::{Serialize, de::DeserializeOwned};
-use tokio::time::timeout;
+use std::sync::Arc;
 
-use core_shared::{AppError, AppResult};
+use async_trait::async_trait;
+use core_shared::ApiError;
+use mod_memory::bootstrap::DependencyProbe;
+use mod_memory::domain::credential::{
+    CredentialSearchProjection, CredentialSearchResponse, SearchCredentialsQuery, extract_stringish,
+};
+use mod_memory::infra::repo::{ProjectionRepository, SearchRepository};
+use tokio::sync::RwLock;
 
-use crate::setup::MeilisearchSettings;
-use crate::surrealdb::DependencyReport;
-
-#[derive(Debug)]
-pub struct MeilisearchService {
-    client: Client,
-    settings: MeilisearchSettings,
+#[derive(Debug, Default)]
+pub struct MeiliCredentialSearch {
+    projections: RwLock<Vec<CredentialSearchProjection>>,
+    ready: RwLock<bool>,
 }
 
-pub async fn bootstrap(settings: MeilisearchSettings) -> MeilisearchService {
-    let client = Client::new(
-        settings.http_addr.clone(),
-        Some(settings.master_key.clone()),
-    )
-    .expect("validated meilisearch configuration must build a client");
-
-    MeilisearchService { client, settings }
-}
-
-impl MeilisearchService {
-    pub fn client(&self) -> &Client {
-        &self.client
+impl MeiliCredentialSearch {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            projections: RwLock::new(Vec::new()),
+            ready: RwLock::new(true),
+        })
     }
 
-    pub fn enabled(&self) -> bool {
-        self.settings.enabled
+    pub async fn set_ready(&self, ready: bool) {
+        *self.ready.write().await = ready;
     }
 
-    pub async fn ensure_index_settings(
-        &self,
-        index_uid: &str,
-        settings: &Settings,
-    ) -> AppResult<()> {
-        self.ensure_enabled()?;
-
-        let task = self
-            .client
-            .index(index_uid)
-            .set_settings(settings)
-            .await
-            .map_err(map_meilisearch_error)?;
-
-        self.client
-            .wait_for_task(task, None, Some(self.settings.connect_timeout))
-            .await
-            .map_err(map_meilisearch_error)?;
-
-        Ok(())
+    pub async fn projection_count(&self) -> usize {
+        self.projections.read().await.len()
     }
 
-    pub async fn add_or_replace_documents<T: Serialize + Send + Sync>(
-        &self,
-        index_uid: &str,
-        primary_key: &str,
-        documents: &[T],
-    ) -> AppResult<()> {
-        self.ensure_enabled()?;
-
-        let task = self
-            .client
-            .index(index_uid)
-            .add_or_replace(documents, Some(primary_key))
-            .await
-            .map_err(map_meilisearch_error)?;
-
-        self.client
-            .wait_for_task(task, None, Some(self.settings.connect_timeout))
-            .await
-            .map_err(map_meilisearch_error)?;
-
-        Ok(())
-    }
-
-    pub async fn search_documents<T: DeserializeOwned + Send + Sync + 'static>(
-        &self,
-        index_uid: &str,
-        query: Option<&str>,
-        filter: Option<&str>,
-        limit: usize,
-        offset: usize,
-    ) -> AppResult<SearchResults<T>> {
-        self.ensure_enabled()?;
-
-        let index = self.client.index(index_uid);
-        let mut search = index.search();
-        if let Some(query) = query.filter(|value| !value.trim().is_empty()) {
-            search.with_query(query);
-        }
-        search.with_limit(limit);
-        search.with_offset(offset);
-        search.show_ranking_score = Some(true);
-        if let Some(filter) = filter.filter(|value| !value.trim().is_empty()) {
-            search.with_filter(filter);
-        }
-
-        search.execute().await.map_err(map_meilisearch_error)
-    }
-
-    pub async fn get_settings(&self, index_uid: &str) -> AppResult<Settings> {
-        self.ensure_enabled()?;
-
-        self.client
-            .index(index_uid)
-            .get_settings()
-            .await
-            .map_err(map_meilisearch_error)
-    }
-
-    pub async fn readiness(&self) -> DependencyReport {
-        if !self.settings.enabled {
-            return DependencyReport {
-                is_ready: false,
-                detail: Some("meilisearch is disabled by configuration".to_string()),
-            };
-        }
-
-        let readiness = timeout(self.settings.readiness_timeout, self.client.health()).await;
-
-        match readiness {
-            Ok(Ok(_)) => DependencyReport {
-                is_ready: true,
-                detail: None,
-            },
-            Ok(Err(error)) => DependencyReport {
-                is_ready: false,
-                detail: Some(error.to_string()),
-            },
-            Err(_) => DependencyReport {
-                is_ready: false,
-                detail: Some(format!(
-                    "readiness probe timed out after {} ms",
-                    self.settings.readiness_timeout.as_millis()
-                )),
-            },
-        }
-    }
-
-    fn ensure_enabled(&self) -> AppResult<()> {
-        if self.settings.enabled {
+    async fn ensure_ready(&self) -> Result<(), ApiError> {
+        if *self.ready.read().await {
             Ok(())
         } else {
-            Err(AppError::search_degraded(
-                "Meilisearch is disabled by configuration",
+            Err(ApiError::service_unavailable(
+                "Credential search projection is unavailable",
             ))
         }
     }
 }
 
-fn map_meilisearch_error(error: MeilisearchError) -> AppError {
-    AppError::search_degraded(format!("Meilisearch request failed: {error}"))
+#[async_trait]
+impl ProjectionRepository for MeiliCredentialSearch {
+    async fn upsert(&self, projection: CredentialSearchProjection) -> Result<(), ApiError> {
+        self.ensure_ready().await?;
+        let mut projections = self.projections.write().await;
+
+        if let Some(existing) = projections
+            .iter_mut()
+            .find(|item| item.credential_id == projection.credential_id)
+        {
+            *existing = projection;
+            return Ok(());
+        }
+
+        projections.push(projection);
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl SearchRepository for MeiliCredentialSearch {
+    async fn search(
+        &self,
+        query: &SearchCredentialsQuery,
+    ) -> Result<CredentialSearchResponse, ApiError> {
+        self.ensure_ready().await?;
+        let normalized_q = query.q.as_ref().map(|value| value.to_lowercase());
+
+        let filtered = self
+            .projections
+            .read()
+            .await
+            .iter()
+            .filter(|projection| {
+                query
+                    .family
+                    .is_none_or(|family| projection.family == family)
+                    && query
+                        .issuer_id
+                        .as_ref()
+                        .is_none_or(|issuer_id| projection.issuer_id.as_ref() == Some(issuer_id))
+                    && normalized_q.as_ref().is_none_or(|needle| {
+                        let name = projection
+                            .name
+                            .as_ref()
+                            .and_then(extract_stringish)
+                            .unwrap_or_default()
+                            .to_lowercase();
+                        let issuer = projection
+                            .issuer
+                            .as_ref()
+                            .and_then(extract_stringish)
+                            .unwrap_or_default()
+                            .to_lowercase();
+                        let preview = projection
+                            .preview
+                            .as_deref()
+                            .unwrap_or_default()
+                            .to_lowercase();
+
+                        name.contains(needle) || issuer.contains(needle) || preview.contains(needle)
+                    })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let items = filtered
+            .iter()
+            .skip(query.offset)
+            .take(query.limit)
+            .map(|projection| projection.to_hit(normalized_q.as_ref().map(|_| 1.0)))
+            .collect::<Vec<_>>();
+
+        Ok(CredentialSearchResponse {
+            items,
+            limit: query.limit,
+            offset: query.offset,
+        })
+    }
+}
+
+#[async_trait]
+impl DependencyProbe for MeiliCredentialSearch {
+    async fn is_ready(&self) -> bool {
+        *self.ready.read().await
+    }
 }

@@ -1,49 +1,76 @@
-use std::time::Duration;
+use std::sync::Arc;
 
-use core_shared::StartupError;
+use async_trait::async_trait;
+use core_shared::ApiError;
+use mod_memory::bootstrap::{CredentialModule, ProjectionSync};
+use mod_memory::infra::repo::{CredentialRepository, ProjectionRepository, SearchRepository};
 
-use crate::{MeilisearchService, SurrealDbService, meilisearch, surrealdb};
+use crate::meilisearch::MeiliCredentialSearch;
+use crate::surrealdb::SurrealCredentialStore;
 
-#[derive(Debug, Clone)]
-pub struct InfrastructureSettings {
-    pub surrealdb: SurrealDbSettings,
-    pub meilisearch: MeilisearchSettings,
+#[derive(Clone)]
+pub struct InfraHandles {
+    pub authoritative_store: Arc<SurrealCredentialStore>,
+    pub search_store: Arc<MeiliCredentialSearch>,
 }
 
-#[derive(Debug)]
-pub struct InfrastructureServices {
-    pub surrealdb: SurrealDbService,
-    pub meilisearch: MeilisearchService,
+#[derive(Clone)]
+pub struct InfraBundle {
+    pub module: CredentialModule,
+    pub handles: InfraHandles,
+    pub projection_sync: Arc<dyn ProjectionSync>,
 }
 
-#[derive(Debug, Clone)]
-pub struct SurrealDbSettings {
-    pub url: String,
-    pub namespace: String,
-    pub database: String,
-    pub username: String,
-    pub password: String,
-    pub connect_timeout: Duration,
-    pub readiness_timeout: Duration,
+pub fn build_infra_bundle() -> InfraBundle {
+    let authoritative_store = SurrealCredentialStore::new();
+    let search_store = MeiliCredentialSearch::new();
+    let sync = Arc::new(InMemoryProjectionSync {
+        authoritative_store: authoritative_store.clone(),
+        search_store: search_store.clone(),
+    });
+
+    let module = CredentialModule::new(
+        authoritative_store.clone() as Arc<dyn CredentialRepository>,
+        search_store.clone() as Arc<dyn SearchRepository>,
+        sync.clone(),
+        authoritative_store.clone(),
+        search_store.clone(),
+    );
+
+    InfraBundle {
+        module,
+        handles: InfraHandles {
+            authoritative_store,
+            search_store,
+        },
+        projection_sync: sync,
+    }
 }
 
-#[derive(Debug, Clone)]
-pub struct MeilisearchSettings {
-    pub http_addr: String,
-    pub master_key: String,
-    pub enabled: bool,
-    pub connect_timeout: Duration,
-    pub readiness_timeout: Duration,
+struct InMemoryProjectionSync {
+    authoritative_store: Arc<SurrealCredentialStore>,
+    search_store: Arc<MeiliCredentialSearch>,
 }
 
-pub async fn bootstrap_infrastructure(
-    settings: &InfrastructureSettings,
-) -> Result<InfrastructureServices, StartupError> {
-    let surrealdb = surrealdb::bootstrap(settings.surrealdb.clone()).await?;
-    let meilisearch = meilisearch::bootstrap(settings.meilisearch.clone()).await;
+#[async_trait]
+impl ProjectionSync for InMemoryProjectionSync {
+    async fn sync_pending(&self) -> Result<(), ApiError> {
+        let jobs = self.authoritative_store.pending_jobs().await?;
+        for job in jobs {
+            let Some(credential) = self
+                .authoritative_store
+                .load_for_projection(&job.credential_id)
+                .await?
+            else {
+                continue;
+            };
 
-    Ok(InfrastructureServices {
-        surrealdb,
-        meilisearch,
-    })
+            self.search_store.upsert(credential.to_projection()).await?;
+            self.authoritative_store
+                .mark_job_completed(job.job_id)
+                .await?;
+        }
+
+        Ok(())
+    }
 }

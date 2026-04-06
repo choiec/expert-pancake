@@ -1,64 +1,24 @@
 [package]
 name = "app_server"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
 
 [dependencies]
-axum = { workspace = true }
+axum.workspace = true
 core_infra = { path = "../core_infra" }
 core_shared = { path = "../core_shared" }
-http = { workspace = true }
+http.workspace = true
 mod_memory = { path = "../mod_memory" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
-tower = { workspace = true }
-tower-http = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-uuid = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true
 
-[[test]]
-name = "health_readiness_contract"
-path = "./tests/contract/health_readiness_contract.rs"
-
-[[test]]
-name = "register_source_contract"
-path = "./tests/contract/register_source_contract.rs"
-
-[[test]]
-name = "register_source_standard_errors"
-path = "./tests/contract/register_source_standard_errors.rs"
-
-[[test]]
-name = "register_source_standard_validation_matrix"
-path = "./tests/contract/register_source_standard_validation_matrix.rs"
-
-[[test]]
-name = "get_source_contract"
-path = "./tests/contract/get_source_contract.rs"
-
-[[test]]
-name = "get_memory_item_contract"
-path = "./tests/contract/get_memory_item_contract.rs"
-
-[[test]]
-name = "search_memory_items_contract"
-path = "./tests/contract/search_memory_items_contract.rs"
-
-[[test]]
-name = "openapi_smoke"
-path = "./tests/contract/openapi_smoke.rs"
-
-[[test]]
-name = "observability_metrics"
-path = "./tests/integration/observability_metrics.rs"
-
-[[test]]
-name = "observability_tracing_flow"
-path = "./tests/integration/observability_tracing_flow.rs"
-
-[[bench]]
-name = "memory_ingest_latency"
-path = "./benches/memory_ingest_latency.rs"
-harness = false
+[dev-dependencies]
+http-body-util.workspace = true
+jsonschema.workspace = true
+serde_yaml.workspace = true
