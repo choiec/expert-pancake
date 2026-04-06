@@ -1,105 +1,26 @@
 # API Contract
 
-**Status**: IMPLEMENTED
+**Status**: IMPLEMENT-READY
 
-This directory contains the public HTTP contract for the first memory-ingest vertical slice.
+This directory contains the schema-native public HTTP contract for the memory-ingest slice after removing the wrapper-era canonical `Source` / `MemoryItem` model.
 
 ## Contract Scope
 
-- `POST /sources/register`
-- `GET /sources/{source-id}`
-- `GET /memory-items/{urn}`
-- `GET /search/memory-items`
+- `POST /credentials/register`
+- `GET /credentials/{credential-id}`
+- `GET /credentials/search`
 - `GET /health`
 - `GET /ready`
 
 ## Contract Principles
 
-- Authoritative retrieval is always served from SurrealDB-backed canonical records.
-- Search is a Meilisearch projection and may be degraded independently. Search responses are projection hits, not authoritative memory-item payloads.
-- `/health` is a local-only liveness probe. `/ready` is the dependency-aware probe for SurrealDB write-path readiness and search degradation reporting.
-- Open Badges and CLR are accepted only at the ingest boundary and do not change the canonical retrieval schema. Validation uses repository-pinned JSON Schema snapshots for the supported credential envelope profiles in this slice; payloads that are shape-valid but cannot map into canonical title and external_id are rejected with HTTP 400, while accepted request bodies are preserved as authoritative canonical content exactly as submitted.
-- Accepted direct-standard ingest is surfaced through `document_type = json` plus one `json_document` memory item. No semantic splitting by credential substructure occurs in this slice.
-- Public indexing progress uses only `queued`, `indexed`, and `deferred`. Internal outbox job states remain implementation-only.
-- Error responses use one JSON envelope with stable `error_code`, `message`, `details`, `timestamp`, and `request_id` fields.
-
-## Coverage Expectations
-
-- HTTP contract tests must assert every published endpoint and every published status code, including `408` for `POST /sources/register`, `200` for `/health`, and `200/503` for `/ready`.
-- HTTP contract and integration coverage must explicitly include Open Badges success, CLR success, schema-invalid standard payload `400`, shape-valid-but-unmappable standard payload `400`, replay, and conflict behavior.
-- Storage-adapter contract tests must complement the public HTTP contract by verifying SurrealDB authoritative guarantees and Meilisearch projection guarantees required by the constitution.
-- Performance validation must use the instrumented metrics pipeline to measure p95/p99 latency and error rate against the published performance criteria.
-
-## Verification Commands
-
-Run the full contract checkpoint, including route-to-OpenAPI smoke verification:
-
-```bash
-cargo test --test get_memory_item_contract \
-	--test get_source_contract \
-	--test health_readiness_contract \
-	--test register_source_contract \
-	--test register_source_standard_errors \
-	--test register_source_standard_validation_matrix \
-	--test search_memory_items_contract \
-	--test openapi_smoke
-```
-
-Run the replay hashing and authoritative outbox mapping verification:
-
-```bash
-cargo test --test register_source_replay_hashing --test indexing_outbox_mapping_contract --test indexing_status_mapping_flow
-```
-
-Run the observability verification tied to the public runtime surface:
-
-```bash
-cargo test --test observability_tracing_flow --test observability_metrics
-```
-
-Run the performance gate and benchmark report:
-
-```bash
-cargo test --test memory_ingest_slo -- --nocapture
-cargo bench --bench memory_ingest_latency
-```
-
-## Search Slice Commands
-
-Run the search endpoint and projection adapter coverage:
-
-```bash
-cargo test --test search_memory_items_contract --test meilisearch_projection_contract --test search_projection_flow --test indexing_status_mapping_flow
-```
-
-Run the observability coverage tied to public endpoint tracing and histogram metrics:
-
-```bash
-cargo test --test observability_tracing_flow --test observability_metrics
-```
-
-Run the performance gate and benchmark for the same slice:
-
-```bash
-cargo test --test memory_ingest_slo
-cargo bench --bench memory_ingest_latency
-```
-
-The search contract is satisfied only if `GET /search/memory-items` returns projection hits on healthy indexing and returns a structured `503` when Meilisearch is unavailable. There is no SurrealDB fallback path for search.
-
-## Operator Notes
-
-- Inspect backlog and retry exhaustion in authoritative SurrealDB outbox rows, not in Meilisearch.
-- Public `indexing_status` is limited to `queued`, `indexed`, and `deferred`; internal job states remain implementation-only.
-- Manual recovery is supported only by requeueing durable `memory_index_job` rows and rebuilding the `memory_items_v1` projection from authoritative `memory_source` and `memory_item` data.
-
-## Implementation Verification Checkpoints
-
-- **Standard-payload validation**: the contract is satisfied only when accepted, schema-invalid, and shape-valid-but-unmappable Open Badges and CLR payloads match the documented allow or reject outcomes and rejected requests create no authoritative state.
-- **Replay hashing**: the contract is satisfied only when formatting-only variants of the same validated standard payload replay to the same authoritative identifiers while retrieval still returns the preserved first-commit content exactly as stored.
-- **Outbox mapping**: the contract is satisfied only when external `indexing_status` values (`queued`, `indexed`, `deferred`) summarize authoritative-plus-outbox state correctly and internal job statuses remain implementation-only.
-- **Performance gates**: the contract is satisfied for release only when the published latency and error-rate criteria are asserted through the documented metrics and load-validation workflow.
+- The authoritative public identity is the official standard credential `id`.
+- Successful authoritative write and read responses return schema-native credential documents directly.
+- Authoritative credential documents use only official top-level keys from the pinned supported family schema.
+- Public authoritative contracts do not expose `source_id`, `external_id`, `urn`, `memory_items`, `source_metadata`, or wrapper-era compatibility fields.
+- Replay and conflict decisions use credential `id` plus semantic payload hash, not raw formatting differences.
+- Retrieval is authoritative; search remains a projection-only surface.
 
 ## Contract File
 
-- `memory-ingest.openapi.yaml`: machine-readable OpenAPI 3.1 contract for the current slice.
+- `memory-ingest.openapi.yaml`: machine-readable OpenAPI 3.1 contract for the schema-native slice.

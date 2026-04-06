@@ -1,208 +1,101 @@
-# Data Model: Memory Ingest Vertical Slice
+# Data Model: Schema-Native Standard Credential Registry
 
 **Status**: IMPLEMENT-READY
 
 ## Purpose
 
-This document defines the canonical data structures for the first memory-ingest slice. The model keeps authoritative persistence protocol-neutral, preserves stable identifiers for retrieval, treats search as a projection-hit surface rather than an authoritative read model, and leaves additive room for future graph projection.
+Define the authoritative and projection entities for the schema-native credential redesign.
 
-## Canonical Entities
+## StandardCredentialRecord
 
-### Source
-
-Represents the external document submitted for ingest after boundary validation and canonicalization.
+Represents the authoritative stored credential after boundary validation and schema-exact filtering.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `source_id` | UUID v5 | yes | Deterministic immutable identifier derived from the canonical source seed |
-| `external_id` | string | yes | Client-supplied unique idempotency key |
-| `title` | string | yes | Non-empty |
-| `summary` | string | no | Optional summary text |
-| `document_type` | enum | yes | `text`, `markdown`, or `json` |
-| `source_metadata` | JSON object | no | User metadata plus reserved `system` namespace |
-| `created_at` | timestamp | yes | Set at first successful registration |
-| `updated_at` | timestamp | yes | Same as `created_at` in this immutable slice |
+| `credential_id` | string | yes | Official standard credential `id` |
+| `family` | enum | yes | `open_badges_v3` or `clr_v2` |
+| `credential` | JSON object | yes | Authoritative schema-exact credential document |
+| `semantic_payload_hash` | string | yes | Replay and conflict comparator |
+| `created_at` | timestamp | yes | First successful registration time |
+| `updated_at` | timestamp | yes | Equal to `created_at` in this immutable slice |
 
-#### Validation Rules
+### StandardCredentialRecord invariants
 
-- `source_id` must be deterministic for the same canonical source seed.
-- `external_id` must be globally unique.
-- `title` must be non-empty after trimming.
-- `document_type` must be `text`, `markdown`, or `json` in the canonical model.
-- `source_metadata.system` is reserved for server-managed fields such as `canonical_payload_hash` and ingest provenance.
-- accepted Open Badges and CLR payloads are persisted as `document_type = json`; the preserved request body is carried by the derived `json_document` memory item rather than a protocol-specific source field.
-- every accepted `Source` must produce at least one `MemoryItem` in this slice.
+- `credential_id` is the public authoritative identity.
+- `credential` contains only official top-level keys for the detected supported family.
+- Official key names remain unchanged, including keys such as `@context`, `credentialSchema`, `credentialStatus`, `credentialSubject`, `proof`, `refreshService`, and `termsOfUse`.
+- No derived wrapper fields such as `source_id`, `external_id`, `memory_items`, `verification`, or `source_metadata` are stored inside the authoritative credential document.
 
-#### Relationships
+## StandardCredentialEnvelope
 
-- One `Source` has one or more `MemoryItem` records.
-- One `Source` has zero or more `MemoryIndexJob` rows over time.
-
-### Memory Item
-
-Represents one normalized content unit derived from a `Source`.
+Authoritative schema-native credential document for supported direct-standard ingest.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `urn` | URN string | yes | Deterministic immutable identifier |
-| `source_id` | UUID | yes | Foreign key to `Source` |
-| `sequence` | integer | yes | Stable zero-based order within source |
-| `unit_type` | enum | yes | `paragraph`, `section`, `json_document`, or `metadata_placeholder` |
-| `start_offset` | integer | yes | Inclusive UTF-8 byte offset into authoritative canonical content |
-| `end_offset` | integer | yes | Exclusive UTF-8 byte offset into authoritative canonical content |
-| `version` | string | yes | Initial canonical schema version, e.g. `v1` |
-| `content` | string | yes | Immutable canonical content body preserved exactly as accepted |
-| `content_hash` | hex string | yes | Hash of canonical content |
-| `item_metadata` | JSON object | no | Extension fields plus reserved `system` namespace |
-| `created_at` | timestamp | yes | Set at registration commit time |
-| `updated_at` | timestamp | yes | Same as `created_at` in this slice |
+| `@context` | string or JSON array | yes | official JSON-LD context value |
+| `awardedDate` | string | no | stored when present |
+| `credentialSchema` | JSON object or JSON array | no | stored when present |
+| `credentialStatus` | JSON object or JSON array | no | stored when present |
+| `credentialSubject` | JSON object | yes | official subject subtree |
+| `description` | string or JSON object | no | stored when present |
+| `endorsement` | JSON object or JSON array | no | stored when present |
+| `endorsementJwt` | string or JSON array | no | stored when present |
+| `evidence` | JSON object or JSON array | no | stored when present |
+| `id` | string | yes | official credential identifier |
+| `image` | string or JSON object | no | stored when present |
+| `issuer` | string or JSON object | yes | official issuer value |
+| `name` | string or JSON object | yes | required for CLR and supported when present for Open Badges |
+| `partial` | boolean | no | CLR-only field stored when present |
+| `proof` | JSON object or JSON array | yes | official proof object or objects |
+| `refreshService` | JSON object or JSON array | no | stored when present |
+| `termsOfUse` | JSON object or JSON array | no | stored when present |
+| `type` | string or JSON array | yes | official JSON-LD type value |
+| `validFrom` | string | yes | official validity start |
+| `validUntil` | string | no | stored when present |
 
-#### Validation Rules
+### StandardCredentialEnvelope invariants
 
-- `sequence` must be unique per `source_id`.
-- `start_offset <= end_offset`.
-- `content_hash` is derived and never client-supplied.
-- Memory items are immutable after creation in this slice.
-- Accepted content is never sanitized, truncated, or rewritten after validation; invalid UTF-8 is rejected before a `MemoryItem` exists.
-- Accepted Open Badges and CLR payloads create exactly one `json_document` memory item whose content is the preserved accepted UTF-8 request body and whose offsets are `[0, content.len_utf8_bytes())`.
+- The authoritative public request and response body is a `StandardCredentialEnvelope`.
+- Top-level keys are restricted to the supported family's official schema keys.
+- Nested content under official keys is preserved as accepted after validation.
 
-#### Relationships
+## CredentialSearchProjection
 
-- Many `MemoryItem` rows belong to one `Source`.
-- One `MemoryItem` may appear in zero or more future graph projections, keyed only by `urn` and `source_id`.
-
-## Canonicalization Rules
-
-- Canonical `text` and `markdown` requests persist the submitted `content` field as authoritative content and normalize from that string directly.
-- Accepted Open Badges and CLR requests persist `document_type = json`, store `external_id` from trimmed `id`, store `title` from trimmed `name`, and preserve the accepted UTF-8 request body string exactly as authoritative content.
-- For direct-standard ingest, the preserved raw body is exposed through one derived `json_document` memory item rather than a protocol-specific source field.
-- Idempotent replay compares a deterministic normalized JSON hash of the validated standard payload, not the preserved raw-body bytes, so formatting-only changes replay to the first authoritative record.
-- Retrieval guarantees apply to the authoritative stored memory-item content. For direct-standard ingest, `GET /memory-items/{urn}` returns the preserved first-commit request body exactly as stored.
-
-## Verification-Critical Invariants
-
-### Standard-Payload Validation
-
-- A canonical `Source` may be created from a supported Open Badges or CLR request only after the pinned boundary schema passes and canonical mapping yields one deterministic non-empty trimmed `id` and `name` pair.
-- Shape-valid but unmappable payloads are rejected before any `Source`, `MemoryItem`, or `MemoryIndexJob` row exists.
-
-### Replay Hashing
-
-- `source_metadata.system.canonical_payload_hash` is the authoritative replay comparison input for standard payloads; it is derived from deterministic normalized JSON after validation and before idempotency comparison.
-- The preserved raw-body content and the replay hash serve different purposes: retrieval uses preserved content, while idempotency uses the normalized hash.
-
-### Outbox Mapping
-
-- `MemoryIndexJob` rows must contain the authoritative identifiers needed to rehydrate projection inputs from `Source` and `MemoryItem` rows without copying projection-only state into authoritative storage.
-- Public `indexing_status` is a derived contract field and never the durable internal job status itself.
-
-### Performance Gates
-
-- Performance evidence is operational rather than entity-native: endpoint metrics and benchmark fixtures must demonstrate the published latency and throughput targets for representative canonical and direct-standard workloads before rollout.
-
-### Retrieval View / Projection
-
-Represents API-facing read models derived from authoritative rows.
-
-#### Source Retrieval View
-
-| Field | Source | Notes |
-|---|---|---|
-| `source_id` | `Source` | Canonical identifier |
-| `external_id` | `Source` | Echoed for client reconciliation |
-| `title` | `Source` | Canonical title |
-| `summary` | `Source` | Optional |
-| `document_type` | `Source` | Canonical document type |
-| `created_at` | `Source` | Registration time |
-| `memory_items` | `MemoryItem[]` | Ordered by ascending `sequence` |
-| `indexing_status` | derived enum | `queued`, `indexed`, or `deferred` only |
-
-#### Search Projection
-
-Stored in Meilisearch as a denormalized, rebuildable projection.
-
-| Field | Source | Notes |
-|---|---|---|
-| `urn` | `MemoryItem` | Search hit identifier |
-| `source_id` | `MemoryItem` | Filter field |
-| `sequence` | `MemoryItem` | Stable ordering inside source |
-| `document_type` | `Source` | Filter field; may be `text`, `markdown`, or `json` |
-| `content_preview` | derived from `MemoryItem.content` | First 500 characters |
-| `content_hash` | `MemoryItem` | Integrity/debug field |
-| `created_at` | `MemoryItem` | Sort field |
-| `updated_at` | `MemoryItem` | Sort field |
-
-#### Search Hit Response
-
-The public search API returns projection hits, not authoritative memory-item records.
-
-| Field | Source | Notes |
-|---|---|---|
-| `urn` | `Search Projection` | Projection hit identifier |
-| `source_id` | `Search Projection` | Filter field |
-| `sequence` | `Search Projection` | Stable order inside source |
-| `document_type` | `Search Projection` | Filter field |
-| `content_preview` | `Search Projection` | Preview text only; not authoritative full content |
-| `score` | Meilisearch | Optional relevance score |
-
-## Supporting Internal Entity
-
-### MemoryIndexJob
-
-Tracks durable indexing work for Meilisearch without making search availability part of the write transaction. Jobs persist source identifiers and status metadata only; projection payloads are rehydrated from authoritative storage during processing.
+Represents a non-authoritative search document rebuilt from authoritative credential rows.
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `job_id` | UUID | yes | Server-assigned |
-| `source_id` | UUID | yes | Groups a source batch |
-| `status` | enum | yes | `pending`, `processing`, `retryable`, `completed`, `dead_letter` |
-| `retry_count` | integer | yes | Starts at 0 |
-| `last_error` | string | no | Sanitized failure summary |
-| `available_at` | timestamp | yes | Next eligible processing time |
-| `created_at` | timestamp | yes | Commit time |
-| `updated_at` | timestamp | yes | Last status change |
+| `credential_id` | string | yes | authoritative credential identity |
+| `family` | enum | yes | projection filter and diagnostics field |
+| `name` | string | no | derived search summary from official credential fields |
+| `issuer` | string | no | derived search summary from official credential fields |
+| `type` | JSON value | yes | official type value copied for filtering |
+| `valid_from` | string | no | copied from `validFrom` when present |
+| `preview` | string | no | search-only preview text |
+| `created_at` | timestamp | yes | sort field |
+| `updated_at` | timestamp | yes | sort field |
 
-#### Verification Notes
+### CredentialSearchProjection invariants
 
-- A committed `MemoryIndexJob` must be sufficient to locate the authoritative `Source` and all related `MemoryItem` rows required to rebuild the intended projection input.
-- Mapping correctness is satisfied only if projection documents can be rehydrated from authoritative rows without losing `urn`, `source_id`, `sequence`, `document_type`, `content_preview`, `content_hash`, `created_at`, or `updated_at` semantics.
+- Search remains non-authoritative.
+- Projection lag or degradation must not change authoritative replay or retrieval behavior.
+- Projection documents are derived entirely from authoritative credential rows.
 
-## State Transitions
+## CredentialIndexJob
 
-### Source Registration Lifecycle
+Represents the durable authoritative outbox record that bridges committed credential state to non-authoritative search projection work.
 
-1. `received`
-2. `validated`
-3. `normalized`
-4. `persisted`
-5. external API status becomes `queued`, `indexed`, or `deferred`
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `job_id` | UUID | yes | stable outbox identifier |
+| `credential_id` | string | yes | authoritative credential reference |
+| `status` | enum | yes | internal values such as `pending`, `processing`, `retryable`, `completed`, `dead_letter` |
+| `retry_count` | integer | yes | bounded retry tracking |
+| `created_at` | timestamp | yes | first durable acceptance time |
+| `updated_at` | timestamp | yes | latest worker status update |
 
-Only `queued`, `indexed`, and `deferred` are externally observable through API responses. Earlier states exist inside the request lifecycle and should emit traces and metrics rather than durable status rows.
+### CredentialIndexJob invariants
 
-### Index Job Lifecycle
-
-1. `pending`
-2. `processing`
-3. `completed`
-
-Retry branch:
-
-1. `processing`
-2. `retryable`
-3. `processing`
-4. `completed` or `dead_letter`
-
-### Public `indexing_status` Mapping
-
-- `queued`: the authoritative write committed successfully and at least one related outbox job is currently `pending` or `processing`.
-- `indexed`: all related projection work is confirmed in Meilisearch and the related outbox job is `completed`.
-- `deferred`: authoritative writes succeeded, but search confirmation is blocked by dependency degradation or retry backlog; one or more related outbox jobs are `retryable` or `dead_letter`, or Meilisearch is unavailable at response time.
-
-## Future Graph Expansion Boundary
-
-- Future graph nodes should be keyed by existing canonical identifiers only:
-  - source node key: `source_id`
-  - memory-item node key: `urn`
-- Future graph edges should derive from canonical metadata such as `source_id`, `sequence`, and reserved relation hints in `item_metadata.system.relations`.
-- This slice establishes the boundary only; runtime FalkorDB behavior remains a no-op adapter.
-- No current entity stores FalkorDB-specific identifiers.
+- A `CredentialIndexJob` is committed in the same authoritative transaction as `StandardCredentialRecord`.
+- Public API responses do not expose internal outbox states directly.
+- Projection workers rehydrate search documents from authoritative credential rows rather than treating the outbox as an alternate source of truth.

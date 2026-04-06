@@ -1,132 +1,64 @@
-# Specification Quality Checklist: Source Document Ingestion and Memory Item Normalization
+# Specification Quality Checklist: Schema-Native Standard Credential Registry
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning  
-**Created**: 2026-03-17  
-**Feature**: [001-memory-ingest/spec.md](spec.md)  
+**Created**: 2026-03-21  
+**Feature**: [001-memory-ingest/spec.md](../spec.md)  
 
 ## Content Quality
 
-- [x] No implementation details (languages, frameworks, APIs)
-  - ✓ Spec focuses on HTTP REST patterns (technology-agnostic), avoids language/framework specifics
-  - ✓ References to SurrealDB/Meilisearch are at adapter-level; core domain is implementation-neutral
-  
+- [x] No implementation details (languages, frameworks, libraries)
+  - The specification describes user-visible behavior, authoritative identity, and contract outcomes without naming implementation crates or storage products.
+
 - [x] Focused on user value and business needs
-  - ✓ Each story articulates why it matters (entry point, end-to-end validation, consistency)
-  - ✓ Success criteria are measurable and user/business-centric (registration latency, accuracy, reliability)
+  - The user stories center on credential registration, replay safety, retrieval, and search usability.
 
 - [x] Written for non-technical stakeholders
-  - ✓ Language is clear and jargon-minimized; technical terms are explained in context
-  - ✓ User scenarios describe workflows without implementation details
-  
+  - The specification uses product-facing vocabulary such as credential, retrieval, replay, and conflict rather than internal code structure.
+
 - [x] All mandatory sections completed
-  - ✓ Problem & Context, Goals, Non-Goals
-  - ✓ Users & Actors
-  - ✓ User Scenarios & Testing (4 P1/P2 stories with acceptance scenarios)
-  - ✓ Requirements (13 functional, 3 key entities)
-  - ✓ Non-Functional Constraints (performance, reliability, observability, security)
-  - ✓ Acceptance Criteria (15+ measurable outcomes)
-  - ✓ Assumptions & Open Questions (7 assumptions, 3 clarification questions, 4 known unknowns)
-  - ✓ Recommended Next Command
+  - Purpose, context, goals, non-goals, user scenarios, edge cases, requirements, key entities, success criteria, acceptance criteria, and test strategy are all present.
 
 ## Requirement Completeness
 
-- [x] No [NEEDS CLARIFICATION] markers remain unresolved
-  - ✓ Three clarifications (Q1, Q2, Q3) are marked and include suggested answers
-  - ✓ Clarifications are critical design decisions, not ambiguities in the spec itself
-  - ✓ Spec is internally consistent and provides default assumptions for each question
-  
+- [x] No `[NEEDS CLARIFICATION]` markers remain
+  - The redesign is expressed without unresolved placeholders.
+
 - [x] Requirements are testable and unambiguous
-  - ✓ Each FR has clear, measurable behavior (FR-001 to FR-013)
-  - ✓ Each FR specifies input/output contracts and error cases
-  - ✓ Acceptance scenarios follow Given-When-Then structure with specific assertions
-  
+  - Each functional requirement maps to observable API or persistence behavior.
+
 - [x] Success criteria are measurable
-  - ✓ Functional criteria: byte-accuracy validation, duplicate prevention, retrieval consistency
-  - ✓ Performance: p95 latency targets (5s, 200ms, 500ms)
-  - ✓ Reliability: database failover, search decoupling, multi-instance consistency
-  - ✓ Observability: request tracing, health check accuracy
-  
-- [x] Success criteria are technology-agnostic (no implementation details)
-  - ✓ Criteria describe outcomes (e.g., "completes in under 5 seconds") not mechanisms
-  - ✓ No mention of frameworks, specific languages, or database products in acceptance criteria
-  
+  - The criteria define observable outcomes for registration, replay, conflict, retrieval, and degraded-search behavior.
+
+- [x] Success criteria are technology-agnostic
+  - The criteria describe outcomes and latency targets, not implementation mechanisms.
+
 - [x] All acceptance scenarios are defined
-  - ✓ User Story 1 (registration): 3 scenarios covering happy path, multi-item splitting, deduplication
-  - ✓ User Story 2 (retrieval): 3 scenarios covering basic get, data integrity, 404 handling
-  - ✓ User Story 3 (source metadata): 2 scenarios covering metadata retrieval and list consistency
-  - ✓ User Story 4 (search): 2 scenarios covering query and filtering
-  
+  - The primary producer and consumer flows have explicit acceptance scenarios.
+
 - [x] Edge cases are identified
-  - ✓ 7 edge cases explicitly listed and handled
-  - ✓ Covers boundary conditions (size, concurrency, malformed data, timeouts, failures)
-  
+  - The specification explicitly covers unsupported top-level fields, unsupported families, replay conflicts, concurrent duplicates, and degraded search.
+
 - [x] Scope is clearly bounded
-  - ✓ Non-Goals section explicitly excludes UI, full 1EdTech support, advanced graph, LLM enrichment, batch ops, auth, schema versioning
-  - ✓ Goals focused on first vertical slice (ingest → normalize → persist → retrieve)
-  - ✓ Bootstrap scope explicitly limits normalization, search, operational readiness
-  
+  - Compatibility wrappers, canonical/manual ingest, raw-body retrieval, and unsupported standards are explicitly out of scope.
+
 - [x] Dependencies and assumptions identified
-  - ✓ 7 key assumptions documented (single tenant, simple normalization, URN scheme, eventual-consistency search, etc.)
-  - ✓ External dependencies: SurrealDB (authoritative), Meilisearch (eventual-consistency), FalkorDB (deferred)
+  - The scope depends on pinned Open Badges 3.0 and CLR 2.0 envelope support and on a non-authoritative search projection.
 
 ## Feature Readiness
 
 - [x] All functional requirements have clear acceptance criteria
-  - ✓ FR-001 (register endpoint) → AC-F1 validates HTTP 201 and URN retrieval
-  - ✓ FR-002 (input validation) → AC-F6 validates edge case handling
-  - ✓ FR-003 (normalization) → AC-F1, AC-F6 validate output consistency
-  - ✓ FR-004 (persistence) → AC-F1, AC-F2, AC-F3 validate data durability and deduplication
-  - ✓ FR-005/006 (retrieval) → AC-F3, AC-F4 validate correctness
-  - ✓ All FRs map to at least one acceptance criterion
-  
+  - FR-001 through FR-013 map to AC-001 through AC-007.
+
 - [x] User scenarios cover primary flows
-  - ✓ P1 stories cover entry point (registration), core value (retrieval), relationships (source metadata)
-  - ✓ P2 story covers future foundation (search)
-  - ✓ Each story can be tested independently and delivers measurable value
-  
+  - Registration, replay/conflict, retrieval, and search/probes are each covered by at least one independently testable story.
+
 - [x] Feature meets measurable outcomes defined in Success Criteria
-  - ✓ Latency targets (5s, 200ms, 500ms) are realistic for described operations
-  - ✓ Accuracy targets (byte-accurate, dedup, consistency) are achievable with proposed architecture
-  - ✓ Reliability targets (no partial commits, search decoupling, multi-instance) are aligned with constitution principles
-  
+  - The success criteria directly exercise the redesign goals around schema-native authority and replay semantics.
+
 - [x] No implementation details leak into specification
-  - ✓ Spec uses REST/HTTP (technology-neutral API contract)
-  - ✓ Database references (SurrealDB, Meilisearch) are at adapter boundary, not in domain model
-  - ✓ Schema is described in implementation-neutral terms (tables, relationships, constraints)
-  - ✓ No language, framework, or library requirements in spec
-
-## Feature Readiness Assessment
-
-**Overall Status**: ✅ **IMPLEMENT-READY**
-
-**Readiness Confidence**: High
-
-**Validation Results**:
-- All mandatory sections completed and well-articulated
-- Requirements are specific, testable, and unambiguous
-- Success criteria are measurable and technology-agnostic
-- User scenarios are independently valuable and testable
-- Edge cases and error handling are explicitly addressed
-- Scope is clearly defined with explicit non-goals
-- Architecture aligns with project constitution (layered handler/service/repo separation; SurrealDB authoritative; Meilisearch eventual-consistency; observability via structured logs and tracing)
-
-**Recommended Path Forward**:
-
-1. **Next**: Run `/speckit.implement` to execute the approved implementation tasks for this feature.
-
-2. **Then**: Run `/speckit.checklist` or `/speckit.analyze` after implementation to validate contract, storage, and observability outcomes against these artifacts.
+  - Internal service-owned identifiers and wrappers are described only as prohibited public behavior, not as implementation requirements.
 
 ## Notes
 
-- Direct Open Badges / CLR ingest is now closed for implementation with explicit `document_type = json`, `json_document` normalization, preserved-content semantics, and normalized replay hashing.
-- Public `indexing_status` vocabulary is aligned across spec, plan, data model, quickstart, and OpenAPI as `queued`, `indexed`, and `deferred`.
-- Constitution compliance:
-  - ✓ Layered architecture (handlers → services → repositories) defined via FRs and error handling
-  - ✓ Canonical domain model (Source, Memory Item, Search Index Entry) defined in Key Entities
-  - ✓ Storage separation (SurrealDB authoritative, Meilisearch eventual) explicitly stated in Non-Goals and Architecture Assumptions
-  - ✓ Observability (structured logs, tracing, health checks, metrics) required in FRs and Non-Functional Constraints
-  - ✓ Security (no PII in logs, immutability, transaction consistency) enforced in NC-011 to NC-014
-
-**Checklist Version**: 1.0.0  
-**Validated By**: speckit.checklist  
-**Date**: 2026-03-17
+- This checklist supersedes the earlier canonical `Source` / `MemoryItem` specification framing.
+- The next artifact in sequence is the technical plan for the schema-native redesign.
